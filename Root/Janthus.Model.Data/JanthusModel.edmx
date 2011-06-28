@@ -1,0 +1,288 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="2.0" xmlns:edmx="http://schemas.microsoft.com/ado/2008/10/edmx">
+  <!-- EF Runtime content -->
+  <edmx:Runtime>
+    <!-- SSDL content -->
+    <edmx:StorageModels>
+    <Schema Namespace="JanthusModel.Store" Alias="Self" Provider="FirebirdSql.Data.FirebirdClient" ProviderManifestToken="2.5" xmlns:store="http://schemas.microsoft.com/ado/2007/12/edm/EntityStoreSchemaGenerator" xmlns="http://schemas.microsoft.com/ado/2009/02/edm/ssdl">
+        <EntityContainer Name="JanthusModelStoreContainer">
+          <EntitySet Name="ActorType" EntityType="JanthusModel.Store.ActorType" store:Type="Tables" Schema="Firebird" />
+          <EntitySet Name="Bestiary" EntityType="JanthusModel.Store.Bestiary" store:Type="Tables" Schema="Firebird" />
+          <EntitySet Name="Class" EntityType="JanthusModel.Store.Class" store:Type="Tables" Schema="Firebird" />
+          <EntitySet Name="Level" EntityType="JanthusModel.Store.Level" store:Type="Tables" Schema="Firebird" />
+          <EntitySet Name="SkillLevel" EntityType="JanthusModel.Store.SkillLevel" store:Type="Tables" Schema="Firebird" />
+          <EntitySet Name="SkillType" EntityType="JanthusModel.Store.SkillType" store:Type="Tables" Schema="Firebird" />
+          <AssociationSet Name="FK_Bestiary_ActorType" Association="JanthusModel.Store.FK_Bestiary_ActorType">
+            <End Role="ActorType" EntitySet="ActorType" />
+            <End Role="Bestiary" EntitySet="Bestiary" />
+          </AssociationSet>
+        </EntityContainer>
+        <EntityType Name="ActorType">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Name="Id" Type="int" Nullable="false" />
+          <Property Name="Name" Type="varchar" Nullable="false" MaxLength="32" />
+          <Property Name="Description" Type="varchar" MaxLength="128" />
+        </EntityType>
+        <EntityType Name="Bestiary">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Name="Id" Type="int" Nullable="false" />
+          <Property Name="ActorTypeId" Type="int" Nullable="false" />
+          <Property Name="InternalId" Type="varchar" Nullable="false" MaxLength="64" />
+          <Property Name="Name" Type="varchar" Nullable="false" MaxLength="32" />
+          <Property Name="Description" Type="varchar" Nullable="false" MaxLength="128" />
+          <Property Name="CurrentHitPoints" Type="decimal" Nullable="false" Precision="15" Scale="2" />
+          <Property Name="SizeMultiplier" Type="decimal" Nullable="false" Precision="15" Scale="2" />
+        </EntityType>
+        <EntityType Name="Class">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Name="Id" Type="int" Nullable="false" />
+          <Property Name="Name" Type="varchar" Nullable="false" MaxLength="32" />
+          <Property Name="ConstitutionRollWeight" Type="double" Nullable="false" />
+          <Property Name="DexterityRollWeight" Type="double" Nullable="false" />
+          <Property Name="IntelligenceRollWeight" Type="double" Nullable="false" />
+          <Property Name="LuckRollWeight" Type="double" Nullable="false" />
+          <Property Name="AttunementRollWeight" Type="double" Nullable="false" />
+          <Property Name="StrengthRollWeight" Type="double" Nullable="false" />
+          <Property Name="WillpowerRollWeight" Type="double" Nullable="false" />
+        </EntityType>
+        <EntityType Name="Level">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Name="Id" Type="int" Nullable="false" />
+          <Property Name="Number" Type="smallint" Nullable="false" />
+          <Property Name="MinimumSumOfAttributes" Type="smallint" Nullable="false" />
+          <Property Name="LevelRankGroupName" Type="varchar" Nullable="false" MaxLength="32" />
+        </EntityType>
+        <EntityType Name="SkillLevel">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Name="Id" Type="int" Nullable="false" />
+          <Property Name="Name" Type="varchar" Nullable="false" MaxLength="32" />
+          <Property Name="ConferredEffectivenessMinimum" Type="decimal" Nullable="false" Precision="15" Scale="2" />
+          <Property Name="ConferredEffectivenessMaximum" Type="decimal" Nullable="false" Precision="15" Scale="2" />
+        </EntityType>
+        <EntityType Name="SkillType">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Name="Id" Type="int" Nullable="false" />
+          <Property Name="Name" Type="varchar" Nullable="false" MaxLength="32" />
+          <Property Name="Description" Type="varchar" MaxLength="128" />
+        </EntityType>
+        <Association Name="FK_Bestiary_ActorType">
+          <End Role="ActorType" Type="JanthusModel.Store.ActorType" Multiplicity="1" />
+          <End Role="Bestiary" Type="JanthusModel.Store.Bestiary" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="ActorType">
+              <PropertyRef Name="Id" />
+            </Principal>
+            <Dependent Role="Bestiary">
+              <PropertyRef Name="ActorTypeId" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+      </Schema></edmx:StorageModels>
+    <!-- CSDL content -->
+    <edmx:ConceptualModels>
+      <Schema Namespace="JanthusModel" Alias="Self" xmlns:annotation="http://schemas.microsoft.com/ado/2009/02/edm/annotation" xmlns="http://schemas.microsoft.com/ado/2008/09/edm">
+        <EntityContainer Name="JanthusModelEntities" annotation:LazyLoadingEnabled="true">
+          <EntitySet Name="Levels" EntityType="JanthusModel.Level" />
+          <EntitySet Name="SkillLevels" EntityType="JanthusModel.SkillLevel" />
+          <EntitySet Name="SkillTypes" EntityType="JanthusModel.SkillType" />
+          <EntitySet Name="Classes" EntityType="JanthusModel.Class" />
+          <EntitySet Name="ActorTypes" EntityType="JanthusModel.ActorType" />
+          <EntitySet Name="Bestiaries" EntityType="JanthusModel.Bestiary" />
+          <AssociationSet Name="FK_Bestiary_ActorType" Association="JanthusModel.FK_Bestiary_ActorType">
+            <End Role="ActorType" EntitySet="ActorTypes" />
+            <End Role="Bestiary" EntitySet="Bestiaries" />
+          </AssociationSet>
+        </EntityContainer>
+        <EntityType Name="Level">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Type="Int32" Name="Id" Nullable="false" />
+          <Property Type="Int16" Name="Number" Nullable="false" />
+          <Property Type="Int16" Name="MinimumSumOfAttributes" Nullable="false" />
+          <Property Type="String" Name="LevelRankGroupName" Nullable="false" MaxLength="32" FixedLength="false" Unicode="true" />
+        </EntityType>
+        <EntityType Name="SkillLevel">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Type="Int32" Name="Id" Nullable="false" />
+          <Property Type="String" Name="Name" Nullable="false" MaxLength="32" FixedLength="false" Unicode="true" />
+          <Property Type="Decimal" Name="ConferredEffectivenessMinimum" Nullable="false" Precision="15" Scale="2" />
+          <Property Type="Decimal" Name="ConferredEffectivenessMaximum" Nullable="false" Precision="15" Scale="2" />
+        </EntityType>
+        <EntityType Name="SkillType">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Type="Int32" Name="Id" Nullable="false" />
+          <Property Type="String" Name="Name" Nullable="false" MaxLength="32" FixedLength="false" Unicode="true" />
+          <Property Type="String" Name="Description" MaxLength="128" FixedLength="false" Unicode="true" />
+        </EntityType>
+        <EntityType Name="Class">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Type="Int32" Name="Id" Nullable="false" />
+          <Property Type="String" Name="Name" Nullable="false" MaxLength="32" FixedLength="false" Unicode="true" />
+          <Property Type="Double" Name="ConstitutionRollWeight" Nullable="false" />
+          <Property Type="Double" Name="DexterityRollWeight" Nullable="false" />
+          <Property Type="Double" Name="IntelligenceRollWeight" Nullable="false" />
+          <Property Type="Double" Name="LuckRollWeight" Nullable="false" />
+          <Property Type="Double" Name="AttunementRollWeight" Nullable="false" />
+          <Property Type="Double" Name="StrengthRollWeight" Nullable="false" />
+          <Property Type="Double" Name="WillpowerRollWeight" Nullable="false" />
+        </EntityType>
+        <EntityType Name="ActorType">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Type="Int32" Name="Id" Nullable="false" />
+          <Property Type="String" Name="Name" Nullable="false" MaxLength="32" FixedLength="false" Unicode="true" />
+          <Property Type="String" Name="Description" MaxLength="128" FixedLength="false" Unicode="true" />
+          <NavigationProperty Name="Bestiaries" Relationship="JanthusModel.FK_Bestiary_ActorType" FromRole="ActorType" ToRole="Bestiary" />
+        </EntityType>
+        <EntityType Name="Bestiary">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Type="Int32" Name="Id" Nullable="false" />
+          <Property Type="Int32" Name="ActorTypeId" Nullable="false" />
+          <Property Type="String" Name="InternalId" Nullable="false" MaxLength="64" FixedLength="false" Unicode="true" />
+          <Property Type="String" Name="Name" Nullable="false" MaxLength="32" FixedLength="false" Unicode="true" />
+          <Property Type="String" Name="Description" Nullable="false" MaxLength="128" FixedLength="false" Unicode="true" />
+          <Property Type="Decimal" Name="CurrentHitPoints" Nullable="false" Precision="15" Scale="2" />
+          <Property Type="Decimal" Name="SizeMultiplier" Nullable="false" Precision="15" Scale="2" />
+          <NavigationProperty Name="ActorType" Relationship="JanthusModel.FK_Bestiary_ActorType" FromRole="Bestiary" ToRole="ActorType" />
+        </EntityType>
+        <Association Name="FK_Bestiary_ActorType">
+          <End Type="JanthusModel.ActorType" Role="ActorType" Multiplicity="1" />
+          <End Type="JanthusModel.Bestiary" Role="Bestiary" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="ActorType">
+              <PropertyRef Name="Id" />
+            </Principal>
+            <Dependent Role="Bestiary">
+              <PropertyRef Name="ActorTypeId" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        </Schema>
+    </edmx:ConceptualModels>
+    <!-- C-S mapping content -->
+    <edmx:Mappings>
+      <Mapping Space="C-S" xmlns="http://schemas.microsoft.com/ado/2008/09/mapping/cs">
+        <EntityContainerMapping StorageEntityContainer="JanthusModelStoreContainer" CdmEntityContainer="JanthusModelEntities">
+          <EntitySetMapping Name="Levels">
+            <EntityTypeMapping TypeName="JanthusModel.Level">
+              <MappingFragment StoreEntitySet="Level">
+                <ScalarProperty Name="LevelRankGroupName" ColumnName="LevelRankGroupName" />
+                <ScalarProperty Name="MinimumSumOfAttributes" ColumnName="MinimumSumOfAttributes" />
+                <ScalarProperty Name="Number" ColumnName="Number" />
+                <ScalarProperty Name="Id" ColumnName="Id" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="SkillLevels">
+            <EntityTypeMapping TypeName="JanthusModel.SkillLevel">
+              <MappingFragment StoreEntitySet="SkillLevel">
+                <ScalarProperty Name="ConferredEffectivenessMaximum" ColumnName="ConferredEffectivenessMaximum" />
+                <ScalarProperty Name="ConferredEffectivenessMinimum" ColumnName="ConferredEffectivenessMinimum" />
+                <ScalarProperty Name="Name" ColumnName="Name" />
+                <ScalarProperty Name="Id" ColumnName="Id" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="SkillTypes">
+            <EntityTypeMapping TypeName="JanthusModel.SkillType">
+              <MappingFragment StoreEntitySet="SkillType">
+                <ScalarProperty Name="Description" ColumnName="Description" />
+                <ScalarProperty Name="Name" ColumnName="Name" />
+                <ScalarProperty Name="Id" ColumnName="Id" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="Classes">
+            <EntityTypeMapping TypeName="JanthusModel.Class">
+              <MappingFragment StoreEntitySet="Class">
+                <ScalarProperty Name="WillpowerRollWeight" ColumnName="WillpowerRollWeight" />
+                <ScalarProperty Name="StrengthRollWeight" ColumnName="StrengthRollWeight" />
+                <ScalarProperty Name="AttunementRollWeight" ColumnName="AttunementRollWeight" />
+                <ScalarProperty Name="LuckRollWeight" ColumnName="LuckRollWeight" />
+                <ScalarProperty Name="IntelligenceRollWeight" ColumnName="IntelligenceRollWeight" />
+                <ScalarProperty Name="DexterityRollWeight" ColumnName="DexterityRollWeight" />
+                <ScalarProperty Name="ConstitutionRollWeight" ColumnName="ConstitutionRollWeight" />
+                <ScalarProperty Name="Name" ColumnName="Name" />
+                <ScalarProperty Name="Id" ColumnName="Id" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="ActorTypes">
+            <EntityTypeMapping TypeName="JanthusModel.ActorType">
+              <MappingFragment StoreEntitySet="ActorType">
+                <ScalarProperty Name="Description" ColumnName="Description" />
+                <ScalarProperty Name="Name" ColumnName="Name" />
+                <ScalarProperty Name="Id" ColumnName="Id" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="Bestiaries">
+            <EntityTypeMapping TypeName="JanthusModel.Bestiary">
+              <MappingFragment StoreEntitySet="Bestiary">
+                <ScalarProperty Name="SizeMultiplier" ColumnName="SizeMultiplier" />
+                <ScalarProperty Name="CurrentHitPoints" ColumnName="CurrentHitPoints" />
+                <ScalarProperty Name="Description" ColumnName="Description" />
+                <ScalarProperty Name="Name" ColumnName="Name" />
+                <ScalarProperty Name="InternalId" ColumnName="InternalId" />
+                <ScalarProperty Name="ActorTypeId" ColumnName="ActorTypeId" />
+                <ScalarProperty Name="Id" ColumnName="Id" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+        </EntityContainerMapping>
+      </Mapping>
+    </edmx:Mappings>
+  </edmx:Runtime>
+  <!-- EF Designer content (DO NOT EDIT MANUALLY BELOW HERE) -->
+  <Designer xmlns="http://schemas.microsoft.com/ado/2008/10/edmx">
+    <Connection>
+      <DesignerInfoPropertySet>
+        <DesignerProperty Name="MetadataArtifactProcessing" Value="EmbedInOutputAssembly" />
+      </DesignerInfoPropertySet>
+    </Connection>
+    <Options>
+      <DesignerInfoPropertySet>
+        <DesignerProperty Name="ValidateOnBuild" Value="true" />
+        <DesignerProperty Name="EnablePluralization" Value="True" />
+        <DesignerProperty Name="IncludeForeignKeysInModel" Value="True" />
+      </DesignerInfoPropertySet>
+    </Options>
+    <!-- Diagram content (shape and connector positions) -->
+    <Diagrams>
+      <Diagram Name="JanthusModel">
+        <EntityTypeShape EntityType="JanthusModel.Level" Width="2" PointX="0.75" PointY="0.75" Height="1.7879850260416665" />
+        <EntityTypeShape EntityType="JanthusModel.SkillLevel" Width="2.375" PointX="3.125" PointY="0.75" Height="1.7879850260416674" />
+        <EntityTypeShape EntityType="JanthusModel.SkillType" Width="1.5" PointX="5.875" PointY="0.75" Height="1.5956835937499996" />
+        <EntityTypeShape EntityType="JanthusModel.Class" Width="2" PointX="0.75" PointY="3" Height="2.7494921874999996" />
+        <EntityTypeShape EntityType="JanthusModel.ActorType" Width="1.5" PointX="3.5" PointY="4" Height="1.7879850260416674" />
+        <EntityTypeShape EntityType="JanthusModel.Bestiary" Width="1.5" PointX="5.625" PointY="4" Height="2.5571907552083317" />
+        <AssociationConnector Association="JanthusModel.FK_Bestiary_ActorType" >
+          <ConnectorPoint PointX="5" PointY="4.8939925130208337" />
+          <ConnectorPoint PointX="5.625" PointY="4.8939925130208337" />
+        </AssociationConnector>
+      </Diagram>
+    </Diagrams>
+  </Designer>
+</edmx:Edmx>
