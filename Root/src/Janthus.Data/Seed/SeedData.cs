@@ -12,6 +12,9 @@ public static class SeedData
         SeedActorTypes(modelBuilder);
         SeedSkillTypes(modelBuilder);
         SeedSkillLevels(modelBuilder);
+        SeedTileDefinitions(modelBuilder);
+        SeedObjectDefinitions(modelBuilder);
+        SeedWorldMaps(modelBuilder);
     }
 
     private static void SeedCharacterClasses(ModelBuilder modelBuilder)
@@ -106,6 +109,33 @@ public static class SeedData
             new SkillLevel { Id = 3, Name = "Journeyman", Description = "Competent practitioner.", ConferredEffectivenessMinimum = 0.4m, ConferredEffectivenessMaximum = 0.6m },
             new SkillLevel { Id = 4, Name = "Expert", Description = "Highly skilled specialist.", ConferredEffectivenessMinimum = 0.6m, ConferredEffectivenessMaximum = 0.8m },
             new SkillLevel { Id = 5, Name = "Master", Description = "Unmatched mastery.", ConferredEffectivenessMinimum = 0.8m, ConferredEffectivenessMaximum = 1.0m }
+        );
+    }
+
+    private static void SeedTileDefinitions(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<TileDefinition>().HasData(
+            new TileDefinition { Id = 1, Name = "Grass", Description = "Lush green grass.", ColorHex = "#228B22", IsWalkable = true, BaseMovementCost = 1.0f },
+            new TileDefinition { Id = 2, Name = "Water", Description = "Deep water.", ColorHex = "#1E5AC8", IsWalkable = false, BaseMovementCost = 0f },
+            new TileDefinition { Id = 3, Name = "Stone", Description = "Solid stone ground.", ColorHex = "#808080", IsWalkable = true, BaseMovementCost = 0.8f },
+            new TileDefinition { Id = 4, Name = "Sand", Description = "Loose sandy ground.", ColorHex = "#D2B464", IsWalkable = true, BaseMovementCost = 1.3f },
+            new TileDefinition { Id = 5, Name = "Dark Grass", Description = "Dense dark vegetation.", ColorHex = "#146414", IsWalkable = true, BaseMovementCost = 1.1f }
+        );
+    }
+
+    private static void SeedObjectDefinitions(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ObjectDefinition>().HasData(
+            new ObjectDefinition { Id = 1, Name = "Tree", Description = "A tall tree.", IsPassable = false, MovementCostModifier = 0f, BlocksLineOfSight = true },
+            new ObjectDefinition { Id = 2, Name = "Boulder", Description = "A large boulder.", IsPassable = false, MovementCostModifier = 0f, BlocksLineOfSight = true },
+            new ObjectDefinition { Id = 3, Name = "Wall", Description = "A stone wall.", IsPassable = false, MovementCostModifier = 0f, BlocksLineOfSight = true }
+        );
+    }
+
+    private static void SeedWorldMaps(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<WorldMap>().HasData(
+            new WorldMap { Id = 1, Name = "Default", Seed = 42, ChunkSize = 32, ChunkCountX = 3, ChunkCountY = 3 }
         );
     }
 }

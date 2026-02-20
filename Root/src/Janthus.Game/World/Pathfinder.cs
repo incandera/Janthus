@@ -12,7 +12,7 @@ public static class Pathfinder
         (1, -1),  (1, 0),  (1, 1)
     };
 
-    public static List<Point> FindPath(TileMap map, Point start, Point goal, List<ActorSprite> actors)
+    public static List<Point> FindPath(ChunkManager map, Point start, Point goal, List<ActorSprite> actors)
     {
         // If the goal is walkable and not actor-blocked (or is start), use it directly.
         // If the goal is not walkable, find nearest walkable tile via BFS from goal.
@@ -39,7 +39,7 @@ public static class Pathfinder
         return AStar(map, start, effectiveGoal, actors, goalIsActorTile ? goal : effectiveGoal);
     }
 
-    public static List<Point> FindPathAdjacentTo(TileMap map, Point start, Point target, List<ActorSprite> actors)
+    public static List<Point> FindPathAdjacentTo(ChunkManager map, Point start, Point target, List<ActorSprite> actors)
     {
         // Find the best adjacent walkable tile to the target
         Point? bestAdj = null;
@@ -68,13 +68,14 @@ public static class Pathfinder
         return AStar(map, start, bestAdj.Value, actors, bestAdj.Value);
     }
 
-    private static List<Point> AStar(TileMap map, Point start, Point goal, List<ActorSprite> actors, Point allowedActorTile)
+    private static List<Point> AStar(ChunkManager map, Point start, Point goal, List<ActorSprite> actors, Point allowedActorTile)
     {
+        // Costs scaled by 10 for integer precision
         var openSet = new PriorityQueue<Point, int>();
         var cameFrom = new Dictionary<Point, Point>();
         var gScore = new Dictionary<Point, int> { [start] = 0 };
 
-        openSet.Enqueue(start, ChebyshevDistance(start, goal));
+        openSet.Enqueue(start, ChebyshevDistance(start, goal) * 10);
 
         while (openSet.Count > 0)
         {
@@ -82,6 +83,8 @@ public static class Pathfinder
 
             if (current == goal)
                 return ReconstructPath(cameFrom, current);
+
+            var currentElevation = map.GetElevation(current.X, current.Y);
 
             foreach (var (dx, dy) in Neighbors)
             {
@@ -94,13 +97,22 @@ public static class Pathfinder
                 if (neighbor != allowedActorTile && IsActorAt(actors, neighbor, start))
                     continue;
 
-                var tentativeG = gScore[current] + 1;
+                // Cliff check: elevation difference > 3 is impassable
+                var neighborElevation = map.GetElevation(neighbor.X, neighbor.Y);
+                var elevDiff = Math.Abs(neighborElevation - currentElevation);
+                if (elevDiff > 3)
+                    continue;
+
+                // Cost = base tile movement cost + climb cost (elevation diff * 0.5), scaled by 10
+                var baseCost = (int)(map.GetMovementCost(neighbor.X, neighbor.Y) * 10);
+                var climbCost = (int)(elevDiff * 5); // 0.5 * 10
+                var tentativeG = gScore[current] + baseCost + climbCost;
 
                 if (!gScore.TryGetValue(neighbor, out var existingG) || tentativeG < existingG)
                 {
                     cameFrom[neighbor] = current;
                     gScore[neighbor] = tentativeG;
-                    var fScore = tentativeG + ChebyshevDistance(neighbor, goal);
+                    var fScore = tentativeG + ChebyshevDistance(neighbor, goal) * 10;
                     openSet.Enqueue(neighbor, fScore);
                 }
             }
@@ -109,7 +121,7 @@ public static class Pathfinder
         return null;
     }
 
-    private static Point FindNearestWalkable(TileMap map, Point origin, List<ActorSprite> actors)
+    private static Point FindNearestWalkable(ChunkManager map, Point origin, List<ActorSprite> actors)
     {
         var visited = new HashSet<Point> { origin };
         var queue = new Queue<Point>();
@@ -125,7 +137,7 @@ public static class Pathfinder
                 if (!visited.Add(neighbor))
                     continue;
 
-                if (neighbor.X < 0 || neighbor.Y < 0 || neighbor.X >= map.Width || neighbor.Y >= map.Height)
+                if (!map.IsInBounds(neighbor.X, neighbor.Y))
                     continue;
 
                 if (map.IsWalkable(neighbor.X, neighbor.Y) && !IsActorAt(actors, neighbor, Point.Zero))
@@ -155,7 +167,7 @@ public static class Pathfinder
         return path;
     }
 
-    private static bool IsPassable(TileMap map, Point tile, List<ActorSprite> actors, Point allowedActorTile)
+    private static bool IsPassable(ChunkManager map, Point tile, List<ActorSprite> actors, Point allowedActorTile)
     {
         if (!map.IsWalkable(tile.X, tile.Y))
             return false;

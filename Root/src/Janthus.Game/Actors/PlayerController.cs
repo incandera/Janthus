@@ -8,15 +8,15 @@ namespace Janthus.Game.Actors;
 public class PlayerController
 {
     public ActorSprite Sprite { get; }
-    private readonly TileMap _tileMap;
+    private readonly ChunkManager _chunkManager;
     private float _moveTimer;
     private const float MoveInterval = 0.15f;
     private List<Point> _path;
 
-    public PlayerController(ActorSprite sprite, TileMap tileMap)
+    public PlayerController(ActorSprite sprite, ChunkManager chunkManager)
     {
         Sprite = sprite;
-        _tileMap = tileMap;
+        _chunkManager = chunkManager;
     }
 
     public void SetPath(List<Point> path)
@@ -31,7 +31,24 @@ public class PlayerController
 
     public void Update(GameTime gameTime, InputManager input)
     {
-        _moveTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
+        var deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+        // Compute speed modifiers
+        var tile = _chunkManager.GetTile(Sprite.TileX, Sprite.TileY);
+        var terrainModifier = tile != null && tile.BaseMovementCost > 0 ? 1.0f / tile.BaseMovementCost : 1.0f;
+        var dexterity = 5;
+        if (Sprite.DomainActor is Model.Entities.LeveledActor leveled)
+            dexterity = leveled.Dexterity.Value;
+        var attributeModifier = 1.0f + (dexterity - 5) * 0.05f;
+        var speedModifier = terrainModifier * attributeModifier;
+
+        // Always update visual interpolation
+        Sprite.UpdateVisual(deltaTime, speedModifier);
+
+        // Only allow a new tile advance once the sprite has visually arrived
+        if (!Sprite.HasReachedTarget) return;
+
+        _moveTimer -= deltaTime;
         if (_moveTimer > 0) return;
 
         var dx = 0;
@@ -50,10 +67,9 @@ public class PlayerController
             var newX = Sprite.TileX + dx;
             var newY = Sprite.TileY + dy;
 
-            if (_tileMap.IsWalkable(newX, newY))
+            if (_chunkManager.IsWalkable(newX, newY))
             {
-                Sprite.TileX = newX;
-                Sprite.TileY = newY;
+                Sprite.SetTilePosition(newX, newY, _chunkManager);
                 _moveTimer = MoveInterval;
             }
             return;
@@ -65,10 +81,9 @@ public class PlayerController
             var next = _path[0];
             _path.RemoveAt(0);
 
-            if (_tileMap.IsWalkable(next.X, next.Y))
+            if (_chunkManager.IsWalkable(next.X, next.Y))
             {
-                Sprite.TileX = next.X;
-                Sprite.TileY = next.Y;
+                Sprite.SetTilePosition(next.X, next.Y, _chunkManager);
                 _moveTimer = MoveInterval;
             }
             else

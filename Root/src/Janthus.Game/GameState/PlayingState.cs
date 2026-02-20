@@ -12,7 +12,7 @@ public class PlayingState : IGameState
 {
     private readonly JanthusGame _game;
     private readonly InputManager _input;
-    private readonly TileMap _tileMap;
+    private readonly ChunkManager _chunkManager;
     private readonly IsometricRenderer _renderer;
     private readonly Camera _camera;
     private readonly PlayerController _playerController;
@@ -21,7 +21,7 @@ public class PlayingState : IGameState
     private bool _paused;
 
     public bool IsPaused => _paused;
-    public TileMap TileMap => _tileMap;
+    public ChunkManager ChunkManager => _chunkManager;
     public Camera Camera => _camera;
     public IsometricRenderer Renderer => _renderer;
     public PlayerController PlayerController => _playerController;
@@ -29,13 +29,13 @@ public class PlayingState : IGameState
     public UIManager UIManager => _uiManager;
 
     public PlayingState(JanthusGame game, InputManager input, SpriteFont font,
-                        TileMap tileMap, IsometricRenderer renderer, Camera camera,
+                        ChunkManager chunkManager, IsometricRenderer renderer, Camera camera,
                         PlayerController playerController, List<NpcController> npcControllers,
                         UIManager uiManager)
     {
         _game = game;
         _input = input;
-        _tileMap = tileMap;
+        _chunkManager = chunkManager;
         _renderer = renderer;
         _camera = camera;
         _playerController = playerController;
@@ -88,26 +88,34 @@ public class PlayingState : IGameState
 
         if (!_paused)
         {
-            // Right-click always works — closes any open menu and opens a new one
-            HandleRightClick();
-
-            // Left-click only when context menu didn't consume this frame's input
-            if (!_uiManager.IsContextMenuVisible && !_uiManager.ContextMenuConsumedInput)
+            // Block all game-world interaction when any menu panel is open
+            if (!_uiManager.IsAnyMenuVisible)
             {
-                HandleLeftClick();
-            }
+                // Right-click always works — closes any open menu and opens a new one
+                HandleRightClick();
 
-            if (!_uiManager.IsContextMenuVisible && !_uiManager.ContextMenuConsumedInput)
-                _playerController.Update(gameTime, _input);
+                // Left-click only when context menu didn't consume this frame's input
+                if (!_uiManager.ContextMenuConsumedInput)
+                {
+                    HandleLeftClick();
+                }
+
+                if (!_uiManager.ContextMenuConsumedInput)
+                    _playerController.Update(gameTime, _input);
+            }
             foreach (var npc in _npcControllers)
             {
                 npc.Update(gameTime);
             }
-            _camera.Follow(_playerController.Sprite.ScreenPosition, _renderer);
+
+            // Update chunk loading based on player position
+            _chunkManager.UpdatePlayerPosition(_playerController.Sprite.TileX, _playerController.Sprite.TileY);
+
+            _camera.Follow(_playerController.Sprite.VisualPosition, _renderer);
         }
 
-        // Camera zoom always works
-        if (_input.ScrollDelta != 0)
+        // Camera zoom — only when no UI panel is consuming the scroll
+        if (_input.ScrollDelta != 0 && !_uiManager.IsAnyMenuVisible)
         {
             _camera.AdjustZoom(_input.ScrollDelta > 0 ? 0.1f : -0.1f);
         }
@@ -133,7 +141,7 @@ public class PlayingState : IGameState
         {
             // Walk to adjacent tile of the NPC's actual tile
             var npcTile = new Point(clickedNpc.TileX, clickedNpc.TileY);
-            var path = Pathfinder.FindPathAdjacentTo(_tileMap, start, npcTile, actorSprites);
+            var path = Pathfinder.FindPathAdjacentTo(_chunkManager, start, npcTile, actorSprites);
             if (path != null)
             {
                 _playerController.ClearPath();
@@ -144,7 +152,7 @@ public class PlayingState : IGameState
 
         // Walk to tile (walkable or nearest walkable)
         {
-            var path = Pathfinder.FindPath(_tileMap, start, tilePos, actorSprites);
+            var path = Pathfinder.FindPath(_chunkManager, start, tilePos, actorSprites);
             if (path != null)
             {
                 _playerController.ClearPath();
@@ -205,7 +213,7 @@ public class PlayingState : IGameState
                             actorSprites.Add(npc.Sprite);
 
                         var start = new Point(_playerController.Sprite.TileX, _playerController.Sprite.TileY);
-                        var path = Pathfinder.FindPath(_tileMap, start, tilePos, actorSprites);
+                        var path = Pathfinder.FindPath(_chunkManager, start, tilePos, actorSprites);
                         if (path != null)
                         {
                             _playerController.ClearPath();
@@ -228,7 +236,7 @@ public class PlayingState : IGameState
 
         foreach (var npc in _npcControllers)
         {
-            var screenPos = _renderer.TileToScreen(npc.Sprite.TileX, npc.Sprite.TileY);
+            var screenPos = npc.Sprite.VisualPosition;
             var cx = screenPos.X + IsometricRenderer.TileWidth / 2f;
             var bottom = screenPos.Y + IsometricRenderer.TileHeight / 2f;
 
@@ -246,27 +254,48 @@ public class PlayingState : IGameState
 
     public void Draw(SpriteBatch spriteBatch)
     {
-        _renderer.DrawMap(spriteBatch, _tileMap, _camera);
+        _renderer.DrawMap(spriteBatch, _chunkManager, _camera);
 
-        // Draw actors depth-sorted
+        // Unified depth-sorted render list combining objects + actors
+        var renderItems = new List<(int depth, Action draw)>();
+
+        // Add actors
         var allSprites = new List<ActorSprite> { _playerController.Sprite };
         foreach (var npc in _npcControllers)
-        {
             allSprites.Add(npc.Sprite);
-        }
-
-        allSprites.Sort((a, b) =>
-        {
-            var depthA = a.TileX + a.TileY;
-            var depthB = b.TileX + b.TileY;
-            return depthA.CompareTo(depthB);
-        });
 
         foreach (var sprite in allSprites)
         {
-            var isPlayer = sprite == _playerController.Sprite;
-            _renderer.DrawActor(spriteBatch, sprite, _camera, isPlayer);
+            var s = sprite;
+            var elev = _chunkManager.GetElevation(s.TileX, s.TileY);
+            var depth = (s.TileX + s.TileY) * 100 - elev * 10;
+            var isPlayer = s == _playerController.Sprite;
+            renderItems.Add((depth, () => _renderer.DrawActor(spriteBatch, s, _chunkManager, _camera, isPlayer)));
         }
+
+        // Add objects from loaded chunks (filtered by visible range)
+        var (visMinX, visMinY, visMaxX, visMaxY) = _renderer.GetVisibleTileRange(_camera, _chunkManager.WorldWidth, _chunkManager.WorldHeight);
+        foreach (var chunk in _chunkManager.LoadedChunks)
+        {
+            var worldOffsetX = chunk.ChunkX * chunk.Size;
+            var worldOffsetY = chunk.ChunkY * chunk.Size;
+
+            foreach (var obj in chunk.Objects)
+            {
+                var o = obj;
+                var wx = worldOffsetX + o.LocalX;
+                var wy = worldOffsetY + o.LocalY;
+                if (wx < visMinX || wx > visMaxX || wy < visMinY || wy > visMaxY)
+                    continue;
+                var elev = chunk.GetElevation(o.LocalX, o.LocalY);
+                var depth = (wx + wy) * 100 - elev * 10;
+                renderItems.Add((depth, () => _renderer.DrawObject(spriteBatch, wx, wy, o.ObjectDefinitionId, elev)));
+            }
+        }
+
+        renderItems.Sort((a, b) => a.depth.CompareTo(b.depth));
+        foreach (var item in renderItems)
+            item.draw();
 
         _uiManager.Draw(spriteBatch);
 

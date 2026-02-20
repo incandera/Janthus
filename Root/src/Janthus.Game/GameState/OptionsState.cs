@@ -34,10 +34,10 @@ public class OptionsState : IGameState
 
     public void Update(GameTime gameTime)
     {
-        // Navigation
-        if (_input.IsKeyPressed(Keys.Up))
+        // Navigation (keyboard + mousewheel)
+        if (_input.IsKeyPressed(Keys.Up) || _input.ScrollDelta > 0)
             _selectedRow = _selectedRow == 0 ? 1 : 0;
-        if (_input.IsKeyPressed(Keys.Down))
+        if (_input.IsKeyPressed(Keys.Down) || _input.ScrollDelta < 0)
             _selectedRow = _selectedRow == 1 ? 0 : 1;
 
         // Cycle option values (live preview)

@@ -123,21 +123,60 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
         player.Luck.Value = 3;
         player.CurrentHitPoints = (decimal)player.MaximumHitPoints;
 
-        // Create map
-        var tileMap = TileMap.GenerateDefault(30, 30);
+        // Set up tile registry and world
+        var tileRegistry = new TileRegistry(_repository);
+        var worldMap = _repository.GetWorldMap("Default");
+
+        // Generate world chunks if not yet generated
+        var existingChunks = _repository.GetChunksForWorld(worldMap.Id);
+        if (existingChunks.Count == 0)
+        {
+            WorldGenerator.Generate(worldMap, _repository);
+        }
+
+        // Create chunk manager and load all chunks
+        var chunkManager = new ChunkManager(worldMap, tileRegistry, _repository);
+        for (int cy = 0; cy < worldMap.ChunkCountY; cy++)
+        {
+            for (int cx = 0; cx < worldMap.ChunkCountX; cx++)
+            {
+                chunkManager.LoadChunk(cx, cy);
+            }
+        }
 
         // Create renderer and camera
         var renderer = new IsometricRenderer(_pixelTexture);
         renderer.SetFont(_font);
         var camera = new Camera(GraphicsDevice.Viewport);
 
-        // Place player in center
-        var playerSprite = new ActorSprite(player, 10, 10, Color.Cyan, "Hero");
-        var playerController = new PlayerController(playerSprite, tileMap);
+        // Place player near center, offset from the pond
+        var worldCenterX = chunkManager.WorldWidth / 2;
+        var worldCenterY = chunkManager.WorldHeight / 2;
+        var playerStartX = worldCenterX + 8;
+        var playerStartY = worldCenterY + 8;
 
-        // Create NPCs with random alignments
+        // Validate spawn — BFS to nearest walkable tile if blocked
+        if (!chunkManager.IsWalkable(playerStartX, playerStartY))
+        {
+            var validSpawn = FindNearestWalkableTile(chunkManager, playerStartX, playerStartY);
+            playerStartX = validSpawn.X;
+            playerStartY = validSpawn.Y;
+        }
+
+        var playerSprite = new ActorSprite(player, playerStartX, playerStartY, Color.Cyan, "Hero");
+        playerSprite.SnapVisualToTile(chunkManager);
+        var playerController = new PlayerController(playerSprite, chunkManager);
+
+        // Create NPCs spread across the inner area
         var npcControllers = new List<NpcController>();
-        var npcPositions = new[] { (5, 5), (10, 8), (20, 12), (7, 20), (22, 22) };
+        var npcPositions = new[]
+        {
+            (worldCenterX - 10, worldCenterY - 10),
+            (worldCenterX + 15, worldCenterY - 5),
+            (worldCenterX + 20, worldCenterY + 12),
+            (worldCenterX - 8, worldCenterY + 20),
+            (worldCenterX + 25, worldCenterY + 25)
+        };
         var npcNames = new[] { "Guard", "Merchant", "Mage", "Rogue", "Ranger" };
         var npcColors = new[] { Color.Orange, Color.Yellow, Color.Purple, Color.LimeGreen, Color.SaddleBrown };
 
@@ -152,29 +191,69 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
             };
             npc.CurrentHitPoints = (decimal)npc.MaximumHitPoints;
 
-            var npcSprite = new ActorSprite(npc, npcPositions[i].Item1, npcPositions[i].Item2,
+            // Validate NPC spawn position
+            var npcX = npcPositions[i].Item1;
+            var npcY = npcPositions[i].Item2;
+            if (!chunkManager.IsWalkable(npcX, npcY))
+            {
+                var validPos = FindNearestWalkableTile(chunkManager, npcX, npcY);
+                npcX = validPos.X;
+                npcY = validPos.Y;
+            }
+
+            var npcSprite = new ActorSprite(npc, npcX, npcY,
                 npcColors[i], npcNames[i]);
+            npcSprite.SnapVisualToTile(chunkManager);
 
             // Calculate adversary relationship
             var seed = player.Name.GetHashCode() ^ npc.Name.GetHashCode()
                        ^ npcPositions[i].Item1 ^ (npcPositions[i].Item2 << 16);
             npcSprite.IsAdversary = AdversaryCalculator.IsAdversary(playerAlignment, npcAlignment, seed);
 
-            npcControllers.Add(new NpcController(npcSprite, tileMap));
+            npcControllers.Add(new NpcController(npcSprite, chunkManager));
         }
 
         // Create UI
         var uiManager = new UIManager(_pixelTexture, _font, player, GraphicsDevice.Viewport);
 
         // Create playing state
-        _playingState = new PlayingState(this, _input, _font, tileMap, renderer, camera,
+        _playingState = new PlayingState(this, _input, _font, chunkManager, renderer, camera,
             playerController, npcControllers, uiManager);
 
         // Center camera on player
-        var playerScreen = renderer.TileToScreen(10, 10);
+        var playerScreen = renderer.TileToScreen(playerStartX, playerStartY);
         camera.Position = playerScreen;
 
         _stateManager.ChangeState(_playingState);
+    }
+
+    private static Point FindNearestWalkableTile(ChunkManager chunkManager, int startX, int startY)
+    {
+        var visited = new HashSet<Point> { new Point(startX, startY) };
+        var queue = new Queue<Point>();
+        queue.Enqueue(new Point(startX, startY));
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            for (int dy = -1; dy <= 1; dy++)
+            {
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    if (dx == 0 && dy == 0) continue;
+                    var neighbor = new Point(current.X + dx, current.Y + dy);
+                    if (!visited.Add(neighbor)) continue;
+                    if (!chunkManager.IsInBounds(neighbor.X, neighbor.Y)) continue;
+
+                    if (chunkManager.IsWalkable(neighbor.X, neighbor.Y))
+                        return neighbor;
+
+                    queue.Enqueue(neighbor);
+                }
+            }
+        }
+
+        return new Point(startX, startY);
     }
 
     private void ApplyResolution()
@@ -291,24 +370,52 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
                 playing.Camera.GetTransformMatrix());
 
             var renderer = playing.Renderer;
-            playing.Camera.Follow(playing.PlayerController.Sprite.ScreenPosition, renderer);
+            playing.Camera.Follow(playing.PlayerController.Sprite.VisualPosition, renderer);
 
-            // Draw map and actors
-            renderer.DrawMap(_spriteBatch, playing.TileMap, playing.Camera);
+            // Draw map
+            var cm = playing.ChunkManager;
+            renderer.DrawMap(_spriteBatch, cm, playing.Camera);
 
-            // Draw actors depth-sorted
+            // Unified depth-sorted render list: objects + actors
+            var renderItems = new List<(int depth, Action draw)>();
+
+            // Add actors
             var allSprites = new List<ActorSprite> { playing.PlayerController.Sprite };
             foreach (var npc in playing.NpcControllers)
-            {
                 allSprites.Add(npc.Sprite);
-            }
-            allSprites.Sort((a, b) => (a.TileX + a.TileY).CompareTo(b.TileX + b.TileY));
 
             foreach (var sprite in allSprites)
             {
-                var isPlayer = sprite == playing.PlayerController.Sprite;
-                renderer.DrawActor(_spriteBatch, sprite, playing.Camera, isPlayer);
+                var s = sprite;
+                var elev = cm.GetElevation(s.TileX, s.TileY);
+                var depth = (s.TileX + s.TileY) * 100 - elev * 10;
+                var isPlayer = s == playing.PlayerController.Sprite;
+                renderItems.Add((depth, () => renderer.DrawActor(_spriteBatch, s, cm, playing.Camera, isPlayer)));
             }
+
+            // Add objects from loaded chunks (filtered by visible range)
+            var (visMinX, visMinY, visMaxX, visMaxY) = renderer.GetVisibleTileRange(playing.Camera, cm.WorldWidth, cm.WorldHeight);
+            foreach (var chunk in cm.LoadedChunks)
+            {
+                var worldOffsetX = chunk.ChunkX * chunk.Size;
+                var worldOffsetY = chunk.ChunkY * chunk.Size;
+
+                foreach (var obj in chunk.Objects)
+                {
+                    var o = obj;
+                    var wx = worldOffsetX + o.LocalX;
+                    var wy = worldOffsetY + o.LocalY;
+                    if (wx < visMinX || wx > visMaxX || wy < visMinY || wy > visMaxY)
+                        continue;
+                    var elev = chunk.GetElevation(o.LocalX, o.LocalY);
+                    var depth = (wx + wy) * 100 - elev * 10;
+                    renderItems.Add((depth, () => renderer.DrawObject(_spriteBatch, wx, wy, o.ObjectDefinitionId, elev)));
+                }
+            }
+
+            renderItems.Sort((a, b) => a.depth.CompareTo(b.depth));
+            foreach (var item in renderItems)
+                item.draw();
 
             _spriteBatch.End();
 

@@ -37,9 +37,9 @@ public class DialogPanel : UIPanel
     {
         if (!IsVisible || _responses.Count == 0) return;
 
-        if (input.IsKeyPressed(Keys.Up))
+        if (input.IsKeyPressed(Keys.Up) || input.ScrollDelta > 0)
             _selectedResponse = (_selectedResponse - 1 + _responses.Count) % _responses.Count;
-        if (input.IsKeyPressed(Keys.Down))
+        if (input.IsKeyPressed(Keys.Down) || input.ScrollDelta < 0)
             _selectedResponse = (_selectedResponse + 1) % _responses.Count;
         if (input.IsKeyPressed(Keys.Enter))
             Hide();

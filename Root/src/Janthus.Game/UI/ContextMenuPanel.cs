@@ -83,13 +83,13 @@ public class ContextMenuPanel : UIPanel
             return;
         }
 
-        // Navigate with Up/Down (arrow keys and WASD)
-        if (input.IsKeyPressed(Keys.Up) || input.IsKeyPressed(Keys.W))
+        // Navigate with Up/Down (arrow keys, WASD, and mousewheel)
+        if (input.IsKeyPressed(Keys.Up) || input.IsKeyPressed(Keys.W) || input.ScrollDelta > 0)
         {
             _selectedIndex = (_selectedIndex - 1 + _items.Count) % _items.Count;
         }
 
-        if (input.IsKeyPressed(Keys.Down) || input.IsKeyPressed(Keys.S))
+        if (input.IsKeyPressed(Keys.Down) || input.IsKeyPressed(Keys.S) || input.ScrollDelta < 0)
         {
             _selectedIndex = (_selectedIndex + 1) % _items.Count;
         }

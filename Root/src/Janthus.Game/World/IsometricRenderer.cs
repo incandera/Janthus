@@ -11,6 +11,7 @@ public class IsometricRenderer
 {
     public const int TileWidth = 64;
     public const int TileHeight = 32;
+    public const int HeightStep = 4;
 
     private readonly Texture2D _pixelTexture;
     private SpriteFont _font;
@@ -32,6 +33,13 @@ public class IsometricRenderer
         return new Vector2(screenX, screenY);
     }
 
+    public Vector2 TileToScreenWithElevation(int tileX, int tileY, int elevation)
+    {
+        var screenX = (tileX - tileY) * (TileWidth / 2);
+        var screenY = (tileX + tileY) * (TileHeight / 2) - elevation * HeightStep;
+        return new Vector2(screenX, screenY);
+    }
+
     public Point ScreenToTile(Vector2 screenPos)
     {
         var halfW = TileWidth / 2f;
@@ -41,25 +49,59 @@ public class IsometricRenderer
         return new Point(tileX, tileY);
     }
 
-    public void DrawMap(SpriteBatch spriteBatch, TileMap map, Camera camera)
+    public (int minX, int minY, int maxX, int maxY) GetVisibleTileRange(Camera camera, int worldWidth, int worldHeight)
     {
-        // Back-to-front render for correct depth
-        for (int y = 0; y < map.Height; y++)
+        var viewport = camera.GetViewport();
+
+        // Transform viewport corners to world space, then to tile coords
+        var topLeft = camera.ScreenToWorld(Vector2.Zero);
+        var topRight = camera.ScreenToWorld(new Vector2(viewport.Width, 0));
+        var bottomLeft = camera.ScreenToWorld(new Vector2(0, viewport.Height));
+        var bottomRight = camera.ScreenToWorld(new Vector2(viewport.Width, viewport.Height));
+
+        var tl = ScreenToTile(topLeft);
+        var tr = ScreenToTile(topRight);
+        var bl = ScreenToTile(bottomLeft);
+        var br = ScreenToTile(bottomRight);
+
+        // 3-tile margin for elevation offset
+        const int margin = 3;
+        var minX = Math.Min(Math.Min(tl.X, tr.X), Math.Min(bl.X, br.X)) - margin;
+        var minY = Math.Min(Math.Min(tl.Y, tr.Y), Math.Min(bl.Y, br.Y)) - margin;
+        var maxX = Math.Max(Math.Max(tl.X, tr.X), Math.Max(bl.X, br.X)) + margin;
+        var maxY = Math.Max(Math.Max(tl.Y, tr.Y), Math.Max(bl.Y, br.Y)) + margin;
+
+        // Clamp to world bounds
+        minX = Math.Max(0, minX);
+        minY = Math.Max(0, minY);
+        maxX = Math.Min(worldWidth - 1, maxX);
+        maxY = Math.Min(worldHeight - 1, maxY);
+
+        return (minX, minY, maxX, maxY);
+    }
+
+    public void DrawMap(SpriteBatch spriteBatch, ChunkManager chunkManager, Camera camera)
+    {
+        var (minX, minY, maxX, maxY) = GetVisibleTileRange(camera, chunkManager.WorldWidth, chunkManager.WorldHeight);
+
+        // Iterate only visible tile range
+        for (int wy = minY; wy <= maxY; wy++)
         {
-            for (int x = 0; x < map.Width; x++)
+            for (int wx = minX; wx <= maxX; wx++)
             {
-                var tile = map.GroundLayer.Tiles[x, y];
+                var tile = chunkManager.GetTile(wx, wy);
                 if (tile == null) continue;
 
-                var screenPos = TileToScreen(x, y);
+                var elevation = chunkManager.GetElevation(wx, wy);
+                var screenPos = TileToScreenWithElevation(wx, wy, elevation);
                 DrawIsoDiamond(spriteBatch, screenPos, tile.Color);
             }
         }
     }
 
-    public void DrawActor(SpriteBatch spriteBatch, ActorSprite sprite, Camera camera, bool isPlayer = false)
+    public void DrawActor(SpriteBatch spriteBatch, ActorSprite sprite, ChunkManager chunkManager, Camera camera, bool isPlayer = false)
     {
-        var screenPos = TileToScreen(sprite.TileX, sprite.TileY);
+        var screenPos = sprite.VisualPosition;
 
         // Draw actor as a colored rectangle centered on the tile
         var actorWidth = 16;
@@ -104,6 +146,64 @@ public class IsometricRenderer
                 labelColor = Color.LimeGreen;
 
             spriteBatch.DrawString(_font, labelText, new Vector2(labelX, labelY), labelColor);
+        }
+    }
+
+    public void DrawObject(SpriteBatch spriteBatch, int worldX, int worldY, int objectDefId, int elevation)
+    {
+        var screenPos = TileToScreenWithElevation(worldX, worldY, elevation);
+        var centerX = (int)(screenPos.X + TileWidth / 2);
+        var baseY = (int)(screenPos.Y + TileHeight / 2);
+
+        switch (objectDefId)
+        {
+            case 1: // Tree — green triangle
+                DrawTreeShape(spriteBatch, centerX, baseY);
+                break;
+            case 2: // Boulder — gray circle
+                DrawBoulderShape(spriteBatch, centerX, baseY);
+                break;
+            case 3: // Wall — dark rectangle
+                var wallRect = new Rectangle(centerX - 12, baseY - 20, 24, 20);
+                spriteBatch.Draw(_pixelTexture, wallRect, new Color(60, 60, 60));
+                break;
+        }
+    }
+
+    private void DrawTreeShape(SpriteBatch spriteBatch, int cx, int baseY)
+    {
+        // Trunk
+        var trunkRect = new Rectangle(cx - 2, baseY - 8, 4, 8);
+        spriteBatch.Draw(_pixelTexture, trunkRect, new Color(101, 67, 33));
+
+        // Canopy — triangle using horizontal scanlines
+        var canopyHeight = 18;
+        var canopyWidth = 16;
+        for (int row = 0; row < canopyHeight; row++)
+        {
+            var w = (int)((1.0f - row / (float)canopyHeight) * canopyWidth);
+            if (w > 0)
+            {
+                spriteBatch.Draw(_pixelTexture,
+                    new Rectangle(cx - w / 2, baseY - 8 - canopyHeight + row, w, 1),
+                    new Color(34, 120, 34));
+            }
+        }
+    }
+
+    private void DrawBoulderShape(SpriteBatch spriteBatch, int cx, int baseY)
+    {
+        // Approximate circle with horizontal scanlines
+        var radius = 7;
+        for (int row = -radius; row <= radius; row++)
+        {
+            var halfWidth = (int)Math.Sqrt(radius * radius - row * row);
+            if (halfWidth > 0)
+            {
+                spriteBatch.Draw(_pixelTexture,
+                    new Rectangle(cx - halfWidth, baseY - radius + row - 4, halfWidth * 2, 1),
+                    new Color(140, 140, 140));
+            }
         }
     }
 

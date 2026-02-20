@@ -6,20 +6,25 @@ namespace Janthus.Game.Actors;
 public class NpcController
 {
     public ActorSprite Sprite { get; }
-    private readonly TileMap _tileMap;
+    private readonly ChunkManager _chunkManager;
     private float _wanderTimer;
     private readonly Random _random = new();
 
-    public NpcController(ActorSprite sprite, TileMap tileMap)
+    public NpcController(ActorSprite sprite, ChunkManager chunkManager)
     {
         Sprite = sprite;
-        _tileMap = tileMap;
+        _chunkManager = chunkManager;
         _wanderTimer = _random.Next(2, 6);
     }
 
     public void Update(GameTime gameTime)
     {
-        _wanderTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
+        var deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+        // Always update visual interpolation
+        Sprite.UpdateVisual(deltaTime, 1.0f);
+
+        _wanderTimer -= deltaTime;
         if (_wanderTimer > 0) return;
 
         _wanderTimer = _random.Next(2, 6);
@@ -30,10 +35,9 @@ public class NpcController
         var newX = Sprite.TileX + dx;
         var newY = Sprite.TileY + dy;
 
-        if (_tileMap.IsWalkable(newX, newY))
+        if (_chunkManager.IsWalkable(newX, newY))
         {
-            Sprite.TileX = newX;
-            Sprite.TileY = newY;
+            Sprite.SetTilePosition(newX, newY, _chunkManager);
         }
     }
 }

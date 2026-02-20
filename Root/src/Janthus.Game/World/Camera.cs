@@ -39,6 +39,8 @@ public class Camera
         Zoom = MathHelper.Clamp(Zoom + delta, MinZoom, MaxZoom);
     }
 
+    public Viewport GetViewport() => _viewport;
+
     public Vector2 ScreenToWorld(Vector2 screenPos)
     {
         var inverseTransform = Matrix.Invert(GetTransformMatrix());

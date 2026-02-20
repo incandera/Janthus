@@ -22,6 +22,7 @@ public class UIManager
     public bool QuitRequested => _pauseMenuPanel.QuitRequested;
     public bool IsContextMenuVisible => _contextMenu.IsVisible;
     public bool ContextMenuConsumedInput => _contextMenu.ConsumedInput;
+    public bool IsAnyMenuVisible => _pauseMenuPanel.IsVisible || _contextMenu.IsVisible || _dialogPanel.IsVisible;
 
     public UIManager(Texture2D pixelTexture, SpriteFont font, PlayerCharacter player, Viewport viewport)
     {

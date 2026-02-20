@@ -23,12 +23,12 @@ public class PauseMenuPanel : UIPanel
     {
         if (!IsVisible) return;
 
-        if (input.IsKeyPressed(Keys.Up) || input.IsKeyPressed(Keys.W))
+        if (input.IsKeyPressed(Keys.Up) || input.IsKeyPressed(Keys.W) || input.ScrollDelta > 0)
         {
             _selectedIndex = (_selectedIndex - 1 + _options.Length) % _options.Length;
         }
 
-        if (input.IsKeyPressed(Keys.Down) || input.IsKeyPressed(Keys.S))
+        if (input.IsKeyPressed(Keys.Down) || input.IsKeyPressed(Keys.S) || input.ScrollDelta < 0)
         {
             _selectedIndex = (_selectedIndex + 1) % _options.Length;
         }

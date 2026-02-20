@@ -26,10 +26,10 @@ public class MenuState : IGameState
 
     public void Update(GameTime gameTime)
     {
-        // Menu navigation
-        if (_input.IsKeyPressed(Keys.Up))
+        // Menu navigation (keyboard + mousewheel)
+        if (_input.IsKeyPressed(Keys.Up) || _input.ScrollDelta > 0)
             _selectedIndex = (_selectedIndex - 1 + MenuItems.Length) % MenuItems.Length;
-        if (_input.IsKeyPressed(Keys.Down))
+        if (_input.IsKeyPressed(Keys.Down) || _input.ScrollDelta < 0)
             _selectedIndex = (_selectedIndex + 1) % MenuItems.Length;
 
         // Select
