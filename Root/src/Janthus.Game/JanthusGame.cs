@@ -10,6 +10,9 @@ using Janthus.Game.GameState;
 using Janthus.Game.Settings;
 using Janthus.Game.World;
 using Janthus.Game.Actors;
+using Janthus.Game.Combat;
+using Janthus.Game.Conversation;
+using Janthus.Game.Saving;
 using Janthus.Game.UI;
 
 namespace Janthus.Game;
@@ -103,12 +106,37 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
             DispositionValues[rng.Next(DispositionValues.Length)]);
     }
 
+    private (ChunkManager chunkManager, IsometricRenderer renderer, Camera camera) SetupWorld()
+    {
+        var tileRegistry = new TileRegistry(_repository);
+        var worldMap = _repository.GetWorldMap("Default");
+
+        var existingChunks = _repository.GetChunksForWorld(worldMap.Id);
+        if (existingChunks.Count == 0)
+        {
+            WorldGenerator.Generate(worldMap, _repository);
+        }
+
+        var chunkManager = new ChunkManager(worldMap, tileRegistry, _repository);
+        for (int cy = 0; cy < worldMap.ChunkCountY; cy++)
+        {
+            for (int cx = 0; cx < worldMap.ChunkCountX; cx++)
+            {
+                chunkManager.LoadChunk(cx, cy);
+            }
+        }
+
+        var renderer = new IsometricRenderer(_pixelTexture);
+        renderer.SetFont(_font);
+        var camera = new Camera(GraphicsDevice.Viewport);
+
+        return (chunkManager, renderer, camera);
+    }
+
     public void StartPlaying()
     {
-        var rng = new Random();
-
-        // Create player character with random alignment
-        var playerAlignment = RandomAlignment(rng);
+        // Create player character with Lawful Good alignment (ensures Guard is friendly)
+        var playerAlignment = new Alignment(LawfulnessType.Lawful, DispositionType.Good);
         var player = new PlayerCharacter
         {
             Name = "Hero",
@@ -122,32 +150,9 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
         player.Attunement.Value = 3;
         player.Luck.Value = 3;
         player.CurrentHitPoints = (decimal)player.MaximumHitPoints;
+        player.CurrentMana = (decimal)player.MaximumMana;
 
-        // Set up tile registry and world
-        var tileRegistry = new TileRegistry(_repository);
-        var worldMap = _repository.GetWorldMap("Default");
-
-        // Generate world chunks if not yet generated
-        var existingChunks = _repository.GetChunksForWorld(worldMap.Id);
-        if (existingChunks.Count == 0)
-        {
-            WorldGenerator.Generate(worldMap, _repository);
-        }
-
-        // Create chunk manager and load all chunks
-        var chunkManager = new ChunkManager(worldMap, tileRegistry, _repository);
-        for (int cy = 0; cy < worldMap.ChunkCountY; cy++)
-        {
-            for (int cx = 0; cx < worldMap.ChunkCountX; cx++)
-            {
-                chunkManager.LoadChunk(cx, cy);
-            }
-        }
-
-        // Create renderer and camera
-        var renderer = new IsometricRenderer(_pixelTexture);
-        renderer.SetFont(_font);
-        var camera = new Camera(GraphicsDevice.Viewport);
+        var (chunkManager, renderer, camera) = SetupWorld();
 
         // Place player near center, offset from the pond
         var worldCenterX = chunkManager.WorldWidth / 2;
@@ -167,33 +172,63 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
         playerSprite.SnapVisualToTile(chunkManager);
         var playerController = new PlayerController(playerSprite, chunkManager);
 
-        // Create NPCs spread across the inner area
+        // Create scenario NPCs
         var npcControllers = new List<NpcController>();
-        var npcPositions = new[]
-        {
-            (worldCenterX - 10, worldCenterY - 10),
-            (worldCenterX + 15, worldCenterY - 5),
-            (worldCenterX + 20, worldCenterY + 12),
-            (worldCenterX - 8, worldCenterY + 20),
-            (worldCenterX + 25, worldCenterY + 25)
-        };
-        var npcNames = new[] { "Guard", "Merchant", "Mage", "Rogue", "Ranger" };
-        var npcColors = new[] { Color.Orange, Color.Yellow, Color.Purple, Color.LimeGreen, Color.SaddleBrown };
 
-        for (int i = 0; i < npcPositions.Length; i++)
+        // NPC definitions: (position, name, color, alignment, stats[7], isScripted)
+        var npcDefs = new (
+            (int x, int y) pos,
+            string name,
+            Color color,
+            Alignment alignment,
+            int[] stats // Con, Dex, Int, Luck, Att, Str, Will
+        )[]
         {
-            var npcAlignment = RandomAlignment(rng);
+            // Guard — nearby, friendly
+            ((worldCenterX - 5, worldCenterY - 5), "Guard", Color.Orange,
+                new Alignment(LawfulnessType.Lawful, DispositionType.Good),
+                new[] { 5, 4, 3, 3, 3, 5, 4 }),
+
+            // Merchant — nearby, neutral
+            ((worldCenterX + 10, worldCenterY - 3), "Merchant", Color.Yellow,
+                new Alignment(LawfulnessType.Neutral, DispositionType.Neutral),
+                new[] { 3, 3, 5, 4, 3, 3, 4 }),
+
+            // Mage — to the east, wounded
+            ((worldCenterX + 20, worldCenterY + 5), "Mage", Color.Purple,
+                new Alignment(LawfulnessType.Neutral, DispositionType.Good),
+                new[] { 3, 3, 7, 4, 6, 3, 5 }),
+
+            // Mercenary Captain — further out, strong adversary, carries Key
+            ((worldCenterX + 28, worldCenterY + 15), "Mercenary", Color.Red,
+                new Alignment(LawfulnessType.Chaotic, DispositionType.Evil),
+                new[] { 7, 5, 3, 4, 3, 7, 5 }),
+
+            // Bandit — near the Captain
+            ((worldCenterX + 25, worldCenterY + 20), "Bandit", Color.DarkRed,
+                new Alignment(LawfulnessType.Chaotic, DispositionType.Evil),
+                new[] { 6, 6, 3, 3, 3, 6, 4 }),
+        };
+
+        foreach (var def in npcDefs)
+        {
             var npc = new NonPlayerCharacter(
-                3 + i, 3, 3, 3, 3, 3, 3,
-                npcAlignment)
+                def.stats[0], def.stats[1], def.stats[2], def.stats[3],
+                def.stats[4], def.stats[5], def.stats[6],
+                def.alignment)
             {
-                Name = npcNames[i]
+                Name = def.name
             };
             npc.CurrentHitPoints = (decimal)npc.MaximumHitPoints;
+            npc.CurrentMana = (decimal)npc.MaximumMana;
+
+            // Mage starts wounded (half HP)
+            if (def.name == "Mage")
+                npc.CurrentHitPoints = Math.Ceiling(npc.CurrentHitPoints / 2);
 
             // Validate NPC spawn position
-            var npcX = npcPositions[i].Item1;
-            var npcY = npcPositions[i].Item2;
+            var npcX = def.pos.x;
+            var npcY = def.pos.y;
             if (!chunkManager.IsWalkable(npcX, npcY))
             {
                 var validPos = FindNearestWalkableTile(chunkManager, npcX, npcY);
@@ -201,30 +236,249 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
                 npcY = validPos.Y;
             }
 
-            var npcSprite = new ActorSprite(npc, npcX, npcY,
-                npcColors[i], npcNames[i]);
+            var npcSprite = new ActorSprite(npc, npcX, npcY, def.color, def.name);
             npcSprite.SnapVisualToTile(chunkManager);
 
-            // Calculate adversary relationship
-            var seed = player.Name.GetHashCode() ^ npc.Name.GetHashCode()
-                       ^ npcPositions[i].Item1 ^ (npcPositions[i].Item2 << 16);
-            npcSprite.IsAdversary = AdversaryCalculator.IsAdversary(playerAlignment, npcAlignment, seed);
+            // Calculate adversary relationship — force adversary for scenario combatants
+            if (def.name == "Mercenary" || def.name == "Bandit")
+            {
+                npcSprite.IsAdversary = true;
+            }
+            else
+            {
+                var seed = player.Name.GetHashCode() ^ npc.Name.GetHashCode()
+                           ^ def.pos.x ^ (def.pos.y << 16);
+                npcSprite.IsAdversary = AdversaryCalculator.IsAdversary(playerAlignment, def.alignment, seed);
+            }
 
             npcControllers.Add(new NpcController(npcSprite, chunkManager));
         }
 
+        // Give player starting gold and equipment
+        player.Gold = 500;
+        var startingSword = _repository.GetItemByName("Short Sword");
+        if (startingSword != null)
+        {
+            player.Inventory.Add(new InventoryItem(startingSword));
+            CombatCalculator.Equip(player, player.Inventory, startingSword);
+        }
+        var startingArmor = _repository.GetItemByName("Leather Armor");
+        if (startingArmor != null)
+        {
+            player.Inventory.Add(new InventoryItem(startingArmor));
+            CombatCalculator.Equip(player, player.Inventory, startingArmor);
+        }
+
+        // Give Merchant NPC starting gold
+        // Equip NPCs based on their roles
+        var combatSkillType = _repository.GetSkillTypes().Find(s => s.Name == "Combat");
+        var apprenticeSkillLevel = _repository.GetSkillLevels().Find(s => s.Name == "Apprentice");
+
+        foreach (var npcCtrl in npcControllers)
+        {
+            var npcActor = npcCtrl.Sprite.DomainActor as NonPlayerCharacter;
+            if (npcActor == null) continue;
+
+            switch (npcCtrl.Sprite.Label)
+            {
+                case "Merchant":
+                    npcActor.Gold = 1000;
+                    break;
+
+                case "Mercenary":
+                    // Mercenary Captain: Mace + Iron Cuirass + Leather Helmet + Key of Stratholme
+                    EquipNpc(npcActor, "Mace");
+                    EquipNpc(npcActor, "Iron Cuirass");
+                    EquipNpc(npcActor, "Leather Helmet");
+                    EquipNpc(npcActor, "Iron Gauntlets");
+                    GiveNpcItem(npcActor, "Key of Stratholme");
+                    if (combatSkillType != null && apprenticeSkillLevel != null)
+                        npcActor.Skills.Add(new Skill { Id = 1, Type = combatSkillType, Level = apprenticeSkillLevel });
+                    npcActor.Gold = 50;
+                    break;
+
+                case "Bandit":
+                    // Bandit: Short Sword + Leather Armor + Leather Boots
+                    EquipNpc(npcActor, "Short Sword");
+                    EquipNpc(npcActor, "Leather Armor");
+                    EquipNpc(npcActor, "Leather Boots");
+                    if (combatSkillType != null && apprenticeSkillLevel != null)
+                        npcActor.Skills.Add(new Skill { Id = 1, Type = combatSkillType, Level = apprenticeSkillLevel });
+                    npcActor.Gold = 25;
+                    break;
+            }
+        }
+
+        // Create combat manager
+        var combatManager = new CombatManager(_repository);
+
         // Create UI
-        var uiManager = new UIManager(_pixelTexture, _font, player, GraphicsDevice.Viewport);
+        var uiManager = new UIManager(_pixelTexture, _font, player, GraphicsDevice.Viewport, combatManager);
+
+        // Create conversation runner
+        var conversationRunner = new ConversationRunner(_repository, player, "Soldier");
 
         // Create playing state
         _playingState = new PlayingState(this, _input, _font, chunkManager, renderer, camera,
-            playerController, npcControllers, uiManager);
+            playerController, npcControllers, uiManager, conversationRunner, _repository, combatManager);
+        _playingState.Font = _font;
 
         // Center camera on player
         var playerScreen = renderer.TileToScreen(playerStartX, playerStartY);
         camera.Position = playerScreen;
 
         _stateManager.ChangeState(_playingState);
+    }
+
+    public void StartFromSave(GameSaveData saveData)
+    {
+        var (chunkManager, renderer, camera) = SetupWorld();
+
+        // Clear existing game flags and restore saved ones
+        _repository.ClearAllGameFlags();
+        foreach (var flag in saveData.GameFlags)
+        {
+            _repository.SetGameFlag(flag.Name, flag.Value);
+        }
+
+        // Restore player
+        var playerData = saveData.Player;
+        var playerAlignment = new Alignment(
+            Enum.Parse<LawfulnessType>(playerData.Lawfulness),
+            Enum.Parse<DispositionType>(playerData.Disposition));
+        var player = new PlayerCharacter
+        {
+            Name = playerData.Name,
+            Alignment = playerAlignment
+        };
+        player.Constitution.Value = playerData.Constitution;
+        player.Dexterity.Value = playerData.Dexterity;
+        player.Intelligence.Value = playerData.Intelligence;
+        player.Luck.Value = playerData.Luck;
+        player.Attunement.Value = playerData.Attunement;
+        player.Strength.Value = playerData.Strength;
+        player.Willpower.Value = playerData.Willpower;
+        player.CurrentHitPoints = playerData.CurrentHitPoints;
+        player.CurrentMana = playerData.CurrentMana;
+        player.Gold = playerData.Gold;
+        player.Status = Enum.Parse<ActorStatus>(playerData.Status);
+
+        // Restore player inventory
+        foreach (var inv in playerData.Inventory)
+        {
+            var item = _repository.GetItem(inv.ItemId);
+            if (item != null)
+                player.Inventory.Add(new InventoryItem(item, inv.Quantity));
+        }
+
+        // Restore player equipment
+        foreach (var eq in playerData.Equipment)
+        {
+            var item = _repository.GetItem(eq.ItemId);
+            if (item != null)
+                CombatCalculator.Equip(player, player.Inventory, item);
+        }
+
+        // Restore player skills
+        RestoreSkills(player.Skills, playerData.Skills);
+
+        var playerColor = new Color { PackedValue = playerData.Color };
+        var playerSprite = new ActorSprite(player, playerData.TileX, playerData.TileY, playerColor, playerData.Name);
+        playerSprite.SnapVisualToTile(chunkManager);
+        var playerController = new PlayerController(playerSprite, chunkManager);
+
+        // Restore NPCs
+        var npcControllers = new List<NpcController>();
+        foreach (var npcData in saveData.Npcs)
+        {
+            var npcAlignment = new Alignment(
+                Enum.Parse<LawfulnessType>(npcData.Lawfulness),
+                Enum.Parse<DispositionType>(npcData.Disposition));
+            var npc = new NonPlayerCharacter(
+                npcData.Constitution, npcData.Dexterity, npcData.Intelligence,
+                npcData.Luck, npcData.Attunement, npcData.Strength, npcData.Willpower,
+                npcAlignment)
+            {
+                Name = npcData.Name
+            };
+            npc.CurrentHitPoints = npcData.CurrentHitPoints;
+            npc.CurrentMana = npcData.CurrentMana;
+            npc.Gold = npcData.Gold;
+            npc.Status = Enum.Parse<ActorStatus>(npcData.Status);
+
+            // Restore NPC inventory
+            foreach (var inv in npcData.Inventory)
+            {
+                var item = _repository.GetItem(inv.ItemId);
+                if (item != null)
+                    npc.Inventory.Add(new InventoryItem(item, inv.Quantity));
+            }
+
+            // Restore NPC equipment
+            foreach (var eq in npcData.Equipment)
+            {
+                var item = _repository.GetItem(eq.ItemId);
+                if (item != null)
+                    CombatCalculator.Equip(npc, npc.Inventory, item);
+            }
+
+            // Restore NPC skills
+            RestoreSkills(npc.Skills, npcData.Skills);
+
+            var npcColor = new Color { PackedValue = npcData.Color };
+            var npcSprite = new ActorSprite(npc, npcData.TileX, npcData.TileY, npcColor, npcData.Name);
+            npcSprite.IsAdversary = npcData.IsAdversary;
+            npcSprite.SnapVisualToTile(chunkManager);
+            npcControllers.Add(new NpcController(npcSprite, chunkManager));
+        }
+
+        // Restore camera
+        camera.Position = new Vector2(saveData.Camera.X, saveData.Camera.Y);
+        camera.Zoom = saveData.Camera.Zoom;
+
+        // Create combat manager
+        var combatManager = new CombatManager(_repository);
+
+        // Create UI
+        var uiManager = new UIManager(_pixelTexture, _font, player, GraphicsDevice.Viewport, combatManager);
+
+        // Create conversation runner
+        var conversationRunner = new ConversationRunner(_repository, player, "Soldier");
+
+        // Create playing state
+        _playingState = new PlayingState(this, _input, _font, chunkManager, renderer, camera,
+            playerController, npcControllers, uiManager, conversationRunner, _repository, combatManager);
+        _playingState.Font = _font;
+
+        _stateManager.ChangeState(_playingState);
+    }
+
+    private void RestoreSkills(List<Skill> targetSkills, List<SkillSaveData> savedSkills)
+    {
+        var skillTypes = _repository.GetSkillTypes();
+        var skillLevels = _repository.GetSkillLevels();
+        foreach (var saved in savedSkills)
+        {
+            var type = skillTypes.Find(t => t.Id == saved.SkillTypeId);
+            var level = skillLevels.Find(l => l.Id == saved.SkillLevelId);
+            if (type != null && level != null)
+                targetSkills.Add(new Skill { Id = targetSkills.Count + 1, Type = type, Level = level });
+        }
+    }
+
+    private void EquipNpc(NonPlayerCharacter npc, string itemName)
+    {
+        var item = _repository.GetItemByName(itemName);
+        if (item == null) return;
+        npc.Inventory.Add(new InventoryItem(item));
+        CombatCalculator.Equip(npc, npc.Inventory, item);
+    }
+
+    private void GiveNpcItem(NonPlayerCharacter npc, string itemName)
+    {
+        var item = _repository.GetItemByName(itemName);
+        if (item == null) return;
+        npc.Inventory.Add(new InventoryItem(item));
     }
 
     private static Point FindNearestWalkableTile(ChunkManager chunkManager, int startX, int startY)

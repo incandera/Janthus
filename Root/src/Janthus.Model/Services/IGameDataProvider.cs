@@ -30,5 +30,28 @@ public interface IGameDataProvider
     // Write operations for world generation
     void SaveChunk(MapChunk chunk);
     void SaveMapObject(MapObject mapObject);
+    void SaveMapObjects(List<MapObject> mapObjects);
     void SaveWorldMap(WorldMap worldMap);
+
+    // Conversations
+    List<Conversation> GetConversationsForNpc(string npcName);
+    ConversationNode GetConversationNode(int nodeId);
+    List<ConversationResponse> GetResponsesForNode(int nodeId);
+    List<ConversationCondition> GetConditionsForConversation(int conversationId);
+    List<ConversationCondition> GetConditionsForResponse(int responseId);
+    List<ConversationAction> GetActionsForResponse(int responseId);
+
+    // Items and trade
+    List<ItemType> GetItemTypes();
+    List<Item> GetItems();
+    Item GetItem(int id);
+    Item GetItemByName(string name);
+    List<MerchantStock> GetMerchantStock(string npcName);
+
+    // Game flags
+    List<GameFlag> GetGameFlags();
+    GameFlag GetGameFlag(string name);
+    void SetGameFlag(string name, string value);
+    void ClearGameFlag(string name);
+    void ClearAllGameFlags();
 }

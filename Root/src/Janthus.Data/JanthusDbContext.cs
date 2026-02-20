@@ -16,6 +16,17 @@ public class JanthusDbContext : DbContext
     public DbSet<MapChunk> MapChunks { get; set; }
     public DbSet<ObjectDefinition> ObjectDefinitions { get; set; }
     public DbSet<MapObject> MapObjects { get; set; }
+    public DbSet<Conversation> Conversations { get; set; }
+    public DbSet<ConversationNode> ConversationNodes { get; set; }
+    public DbSet<ConversationResponse> ConversationResponses { get; set; }
+    public DbSet<ConversationCondition> ConversationConditions { get; set; }
+    public DbSet<ConversationAction> ConversationActions { get; set; }
+    public DbSet<GameFlag> GameFlags { get; set; }
+    public DbSet<ItemType> ItemTypes { get; set; }
+    public DbSet<Item> Items { get; set; }
+    public DbSet<Quality> Qualities { get; set; }
+    public DbSet<Material> Materials { get; set; }
+    public DbSet<MerchantStock> MerchantStocks { get; set; }
 
     public JanthusDbContext(DbContextOptions<JanthusDbContext> options) : base(options) { }
 
@@ -96,6 +107,98 @@ public class JanthusDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.MapChunkId);
+        });
+
+        modelBuilder.Entity<Conversation>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.NpcName).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Title).HasMaxLength(200);
+            entity.HasIndex(e => e.NpcName);
+            entity.Ignore(e => e.Conditions);
+        });
+
+        modelBuilder.Entity<ConversationNode>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.SpeakerName).HasMaxLength(100);
+            entity.Property(e => e.Text).IsRequired().HasMaxLength(1000);
+            entity.HasIndex(e => e.ConversationId);
+            entity.Ignore(e => e.Responses);
+        });
+
+        modelBuilder.Entity<ConversationResponse>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Text).IsRequired().HasMaxLength(500);
+            entity.HasIndex(e => e.NodeId);
+            entity.Ignore(e => e.Conditions);
+            entity.Ignore(e => e.Actions);
+        });
+
+        modelBuilder.Entity<ConversationCondition>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Value).HasMaxLength(200);
+            entity.HasIndex(e => e.ConversationId);
+            entity.HasIndex(e => e.ResponseId);
+        });
+
+        modelBuilder.Entity<ConversationAction>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Value).HasMaxLength(200);
+            entity.HasIndex(e => e.ResponseId);
+        });
+
+        modelBuilder.Entity<GameFlag>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.HasIndex(e => e.Name).IsUnique();
+            entity.Property(e => e.Value).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<ItemType>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Ignore(e => e.InternalId);
+        });
+
+        modelBuilder.Entity<Item>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Ignore(e => e.InternalId);
+            entity.Ignore(e => e.Type);
+            entity.Ignore(e => e.Quality);
+            entity.Ignore(e => e.Material);
+            entity.Ignore(e => e.EffectList);
+            entity.Ignore(e => e.CraftComponents);
+            entity.Property<int>("ItemTypeId");
+        });
+
+        modelBuilder.Entity<Quality>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Ignore(e => e.InternalId);
+            entity.Ignore(e => e.AttributeMultipliers);
+        });
+
+        modelBuilder.Entity<Material>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Ignore(e => e.InternalId);
+        });
+
+        modelBuilder.Entity<MerchantStock>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.NpcName).IsRequired().HasMaxLength(100);
+            entity.HasIndex(e => e.NpcName);
         });
 
         SeedData.Apply(modelBuilder);

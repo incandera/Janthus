@@ -1,4 +1,5 @@
 using Microsoft.Xna.Framework;
+using Janthus.Model.Enums;
 using Janthus.Game.World;
 
 namespace Janthus.Game.Actors;
@@ -17,12 +18,16 @@ public class NpcController
         _wanderTimer = _random.Next(2, 6);
     }
 
-    public void Update(GameTime gameTime)
+    public void Update(GameTime gameTime, bool isInCombat = false)
     {
         var deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
         // Always update visual interpolation
         Sprite.UpdateVisual(deltaTime, 1.0f);
+
+        // Skip wander logic when dead or in combat
+        if (Sprite.DomainActor.Status == ActorStatus.Dead) return;
+        if (isInCombat) return;
 
         _wanderTimer -= deltaTime;
         if (_wanderTimer > 0) return;

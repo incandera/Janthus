@@ -15,6 +15,14 @@ public class GameDataRepository : IGameDataProvider
     private List<SkillLevel> _skillLevels;
     private List<TileDefinition> _tileDefinitions;
     private List<ObjectDefinition> _objectDefinitions;
+    private List<Conversation> _conversations;
+    private List<ConversationNode> _conversationNodes;
+    private List<ConversationResponse> _conversationResponses;
+    private List<ConversationCondition> _conversationConditions;
+    private List<ConversationAction> _conversationActions;
+    private List<ItemType> _itemTypes;
+    private List<Item> _items;
+    private List<MerchantStock> _merchantStock;
 
     public GameDataRepository(JanthusDbContext context)
     {
@@ -143,12 +151,163 @@ public class GameDataRepository : IGameDataProvider
         _context.SaveChanges();
     }
 
+    public void SaveMapObjects(List<MapObject> mapObjects)
+    {
+        _context.MapObjects.AddRange(mapObjects);
+        _context.SaveChanges();
+    }
+
     public void SaveWorldMap(WorldMap worldMap)
     {
         if (worldMap.Id == 0)
             _context.WorldMaps.Add(worldMap);
         else
             _context.WorldMaps.Update(worldMap);
+        _context.SaveChanges();
+    }
+
+    public List<Conversation> GetConversationsForNpc(string npcName)
+    {
+        _conversations ??= _context.Conversations.ToList();
+        _conversationConditions ??= _context.ConversationConditions.ToList();
+
+        var conversations = _conversations
+            .Where(c => c.NpcName == npcName)
+            .OrderByDescending(c => c.Priority)
+            .ToList();
+
+        foreach (var conv in conversations)
+        {
+            conv.Conditions = _conversationConditions
+                .Where(c => c.ConversationId == conv.Id).ToList();
+        }
+
+        return conversations;
+    }
+
+    public ConversationNode GetConversationNode(int nodeId)
+    {
+        _conversationNodes ??= _context.ConversationNodes.ToList();
+        return _conversationNodes.SingleOrDefault(n => n.Id == nodeId);
+    }
+
+    public List<ConversationResponse> GetResponsesForNode(int nodeId)
+    {
+        _conversationResponses ??= _context.ConversationResponses.ToList();
+        _conversationConditions ??= _context.ConversationConditions.ToList();
+        _conversationActions ??= _context.ConversationActions.ToList();
+
+        var responses = _conversationResponses
+            .Where(r => r.NodeId == nodeId)
+            .OrderBy(r => r.SortOrder)
+            .ToList();
+
+        foreach (var resp in responses)
+        {
+            resp.Conditions = _conversationConditions
+                .Where(c => c.ResponseId == resp.Id).ToList();
+            resp.Actions = _conversationActions
+                .Where(a => a.ResponseId == resp.Id).ToList();
+        }
+
+        return responses;
+    }
+
+    public List<ConversationCondition> GetConditionsForConversation(int conversationId)
+    {
+        _conversationConditions ??= _context.ConversationConditions.ToList();
+        return _conversationConditions.Where(c => c.ConversationId == conversationId).ToList();
+    }
+
+    public List<ConversationCondition> GetConditionsForResponse(int responseId)
+    {
+        _conversationConditions ??= _context.ConversationConditions.ToList();
+        return _conversationConditions.Where(c => c.ResponseId == responseId).ToList();
+    }
+
+    public List<ConversationAction> GetActionsForResponse(int responseId)
+    {
+        _conversationActions ??= _context.ConversationActions.ToList();
+        return _conversationActions.Where(a => a.ResponseId == responseId).ToList();
+    }
+
+    public List<ItemType> GetItemTypes()
+    {
+        _itemTypes ??= _context.ItemTypes.OrderBy(x => x.Id).ToList();
+        return _itemTypes;
+    }
+
+    public List<Item> GetItems()
+    {
+        if (_items == null)
+        {
+            var itemTypes = GetItemTypes();
+            _items = _context.Items.OrderBy(x => x.Id).ToList();
+            foreach (var item in _items)
+            {
+                var typeId = _context.Entry(item).Property<int>("ItemTypeId").CurrentValue;
+                item.Type = itemTypes.SingleOrDefault(t => t.Id == typeId);
+            }
+        }
+        return _items;
+    }
+
+    public Item GetItem(int id)
+    {
+        return GetItems().SingleOrDefault(x => x.Id == id);
+    }
+
+    public Item GetItemByName(string name)
+    {
+        return GetItems().SingleOrDefault(x =>
+            string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public List<MerchantStock> GetMerchantStock(string npcName)
+    {
+        _merchantStock ??= _context.MerchantStocks.ToList();
+        return _merchantStock.Where(s => s.NpcName == npcName).ToList();
+    }
+
+    public List<GameFlag> GetGameFlags()
+    {
+        return _context.GameFlags.ToList();
+    }
+
+    public GameFlag GetGameFlag(string name)
+    {
+        return _context.GameFlags.SingleOrDefault(f => f.Name == name);
+    }
+
+    public void SetGameFlag(string name, string value)
+    {
+        var flag = _context.GameFlags.SingleOrDefault(f => f.Name == name);
+        if (flag == null)
+        {
+            flag = new GameFlag { Name = name, Value = value };
+            _context.GameFlags.Add(flag);
+        }
+        else
+        {
+            flag.Value = value;
+        }
+        _context.SaveChanges();
+    }
+
+    public void ClearGameFlag(string name)
+    {
+        var flag = _context.GameFlags.SingleOrDefault(f => f.Name == name);
+        if (flag != null)
+        {
+            _context.GameFlags.Remove(flag);
+            _context.SaveChanges();
+        }
+    }
+
+    public void ClearAllGameFlags()
+    {
+        var flags = _context.GameFlags.ToList();
+        _context.GameFlags.RemoveRange(flags);
         _context.SaveChanges();
     }
 }

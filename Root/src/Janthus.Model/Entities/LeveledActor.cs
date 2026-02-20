@@ -1,3 +1,4 @@
+using Janthus.Model.Enums;
 using Janthus.Model.Services;
 
 namespace Janthus.Model.Entities;
@@ -63,6 +64,44 @@ public class LeveledActor : Actor
     public double MaximumMana => CharacterCalculator.CalculateMana(Attunement, Intelligence, Willpower);
 
     public override List<Attack> AttackList { get; set; } = new();
+
+    // Equipment system (runtime-only, not DB-persisted)
+    public Dictionary<EquipmentSlot, Item> Equipment { get; set; } = new();
+
+    public int EffectiveStrength => Strength.Value + GetEquipmentBonus(i => i.StrengthBonus);
+    public int EffectiveDexterity => Dexterity.Value + GetEquipmentBonus(i => i.DexterityBonus);
+    public int EffectiveConstitution => Constitution.Value + GetEquipmentBonus(i => i.ConstitutionBonus);
+    public int EffectiveLuck => Luck.Value + GetEquipmentBonus(i => i.LuckBonus);
+
+    public decimal TotalEquipmentAttackRating
+    {
+        get
+        {
+            var total = 0m;
+            foreach (var kvp in Equipment)
+                total += kvp.Value.AttackRating;
+            return total;
+        }
+    }
+
+    public decimal TotalEquipmentArmorRating
+    {
+        get
+        {
+            var total = 0m;
+            foreach (var kvp in Equipment)
+                total += kvp.Value.ArmorRating;
+            return total;
+        }
+    }
+
+    private int GetEquipmentBonus(Func<Item, int> selector)
+    {
+        var total = 0;
+        foreach (var kvp in Equipment)
+            total += selector(kvp.Value);
+        return total;
+    }
 
     private readonly IGameDataProvider _dataProvider;
 

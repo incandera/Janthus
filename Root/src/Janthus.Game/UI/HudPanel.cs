@@ -45,10 +45,15 @@ public class HudPanel : UIPanel
 
         // Mana bar
         var maxMana = _player.MaximumMana;
-        var manaFill = maxMana > 0 ? 1.0f : 0; // Start at full
+        var currentMana = _player.CurrentMana;
+        var manaFill = maxMana > 0 ? (float)(currentMana / (decimal)maxMana) : 0;
         spriteBatch.DrawString(Font, "MP", new Vector2(x, y), Color.CornflowerBlue);
         DrawBar(spriteBatch, new Rectangle(x + 30, y + 2, 150, 14), manaFill, Color.CornflowerBlue, new Color(20, 20, 60));
-        spriteBatch.DrawString(Font, $"{(int)maxMana}/{(int)maxMana}", new Vector2(x + 185, y), Color.White);
+        spriteBatch.DrawString(Font, $"{(int)currentMana}/{(int)maxMana}", new Vector2(x + 185, y), Color.White);
+        y += 20;
+
+        // Gold display
+        spriteBatch.DrawString(Font, $"Gold: {_player.Gold:F0}", new Vector2(x, y), Color.Yellow);
 
         // Pause indicator
         if (_isPaused)

@@ -112,7 +112,7 @@ public class IsometricRenderer
             actorWidth,
             actorHeight);
 
-        spriteBatch.Draw(_pixelTexture, rect, sprite.Color);
+        spriteBatch.Draw(_pixelTexture, rect, sprite.EffectiveColor);
 
         // Draw a small shadow under the actor
         var shadowRect = new Rectangle(

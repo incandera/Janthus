@@ -2,6 +2,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Janthus.Game.Input;
+using Janthus.Game.Saving;
 
 namespace Janthus.Game.GameState;
 
@@ -11,7 +12,8 @@ public class MenuState : IGameState
     private readonly InputManager _input;
     private readonly SpriteFont _font;
 
-    private static readonly string[] MenuItems = { "New Game", "Options", "Quit" };
+    private readonly string[] _menuItems;
+    private readonly bool _hasContinue;
     private int _selectedIndex;
 
     public MenuState(JanthusGame game, InputManager input, SpriteFont font)
@@ -19,6 +21,11 @@ public class MenuState : IGameState
         _game = game;
         _input = input;
         _font = font;
+
+        _hasContinue = SaveManager.AnySavesExist();
+        _menuItems = _hasContinue
+            ? new[] { "Continue", "New Game", "Options", "Quit" }
+            : new[] { "New Game", "Options", "Quit" };
     }
 
     public void Enter() { }
@@ -28,24 +35,30 @@ public class MenuState : IGameState
     {
         // Menu navigation (keyboard + mousewheel)
         if (_input.IsKeyPressed(Keys.Up) || _input.ScrollDelta > 0)
-            _selectedIndex = (_selectedIndex - 1 + MenuItems.Length) % MenuItems.Length;
+            _selectedIndex = (_selectedIndex - 1 + _menuItems.Length) % _menuItems.Length;
         if (_input.IsKeyPressed(Keys.Down) || _input.ScrollDelta < 0)
-            _selectedIndex = (_selectedIndex + 1) % MenuItems.Length;
+            _selectedIndex = (_selectedIndex + 1) % _menuItems.Length;
 
         // Select
         if (_input.IsKeyPressed(Keys.Enter) &&
             !_input.IsKeyDown(Keys.LeftAlt) && !_input.IsKeyDown(Keys.RightAlt))
         {
-            switch (_selectedIndex)
+            var selected = _menuItems[_selectedIndex];
+            switch (selected)
             {
-                case 0: // New Game
+                case "Continue":
+                    var saveData = SaveManager.LoadMostRecent();
+                    if (saveData != null)
+                        _game.StartFromSave(saveData);
+                    break;
+                case "New Game":
                     _game.StartPlaying();
                     break;
-                case 1: // Options
+                case "Options":
                     var options = new OptionsState(_game, _input, _font);
                     _game.StateManager.PushState(options);
                     break;
-                case 2: // Quit
+                case "Quit":
                     _game.Exit();
                     break;
             }
@@ -76,9 +89,9 @@ public class MenuState : IGameState
         float menuStartY = viewport.Height * 0.5f;
         float itemSpacing = 24f;
 
-        for (int i = 0; i < MenuItems.Length; i++)
+        for (int i = 0; i < _menuItems.Length; i++)
         {
-            var item = MenuItems[i];
+            var item = _menuItems[i];
             var itemSize = _font.MeasureString(item);
             float y = menuStartY + i * itemSpacing;
             float x = (viewport.Width - itemSize.X) / 2f;

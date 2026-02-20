@@ -58,6 +58,15 @@ public class CharacterPanel : UIPanel
         y += lineHeight;
         spriteBatch.DrawString(Font, $"Max Mana: {_player.MaximumMana:F0}", new Vector2(x, y), Color.White);
         y += lineHeight;
+
+        // Attack/Armor ratings (base + equipment, no skill modifier)
+        var baseAttack = _player.EffectiveStrength * 1.5m + _player.TotalEquipmentAttackRating;
+        var baseArmor = _player.EffectiveConstitution * 0.5m + _player.TotalEquipmentArmorRating;
+        spriteBatch.DrawString(Font, $"Attack: {baseAttack:F0}", new Vector2(x, y), Color.OrangeRed);
+        y += lineHeight;
+        spriteBatch.DrawString(Font, $"Armor:  {baseArmor:F0}", new Vector2(x, y), Color.SteelBlue);
+        y += lineHeight;
+
         spriteBatch.DrawString(Font, $"Sum of Attr: {_player.SumOfAttributes}", new Vector2(x, y), Color.LightGray);
 
         y += lineHeight + 10;

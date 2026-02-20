@@ -1,5 +1,6 @@
 using Microsoft.Xna.Framework;
 using Janthus.Model.Entities;
+using Janthus.Model.Enums;
 using Janthus.Game.World;
 
 namespace Janthus.Game.Actors;
@@ -12,6 +13,8 @@ public class ActorSprite
     public Color Color { get; set; }
     public string Label { get; set; }
     public bool IsAdversary { get; set; }
+
+    public Color EffectiveColor => DomainActor.Status == ActorStatus.Dead ? Color.DarkGray : Color;
 
     public Vector2 VisualPosition { get; set; }
     private Vector2 _targetPosition;

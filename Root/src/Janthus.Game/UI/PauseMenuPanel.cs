@@ -7,10 +7,12 @@ namespace Janthus.Game.UI;
 
 public class PauseMenuPanel : UIPanel
 {
-    private readonly string[] _options = { "Resume", "Save (stub)", "Load (stub)", "Quit" };
+    private readonly string[] _options = { "Resume", "Save", "Load", "Quit" };
     private int _selectedIndex;
 
     public bool ResumeRequested { get; set; }
+    public bool SaveRequested { get; set; }
+    public bool LoadRequested { get; set; }
     public bool QuitRequested { get; set; }
 
     public PauseMenuPanel(Texture2D pixelTexture, SpriteFont font, Rectangle bounds)
@@ -40,9 +42,11 @@ public class PauseMenuPanel : UIPanel
                 case 0: // Resume
                     ResumeRequested = true;
                     break;
-                case 1: // Save stub
+                case 1: // Save
+                    SaveRequested = true;
                     break;
-                case 2: // Load stub
+                case 2: // Load
+                    LoadRequested = true;
                     break;
                 case 3: // Quit
                     QuitRequested = true;

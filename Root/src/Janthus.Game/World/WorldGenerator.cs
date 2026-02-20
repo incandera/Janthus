@@ -102,13 +102,13 @@ public static class WorldGenerator
             }
         }
 
-        // Second pass: place objects
-        // Use a separate Random seeded deterministically for object placement
+        // Second pass: place objects (batched for performance)
         var objRng = new Random(worldMap.Seed + 1000);
 
-        // ObjectDefinition IDs: Tree=1, Boulder=2
         const int TreeId = 1;
         const int BoulderId = 2;
+
+        var allObjects = new List<MapObject>();
 
         for (int cy = 0; cy < worldMap.ChunkCountY; cy++)
         {
@@ -124,10 +124,9 @@ public static class WorldGenerator
                         var wy = cy * chunkSize + ly;
                         var tileId = terrain[wx, wy];
 
-                        // Trees on grass/dark grass (10% chance)
                         if ((tileId == Grass || tileId == DarkGrass) && objRng.Next(100) < 10)
                         {
-                            provider.SaveMapObject(new MapObject
+                            allObjects.Add(new MapObject
                             {
                                 MapChunkId = chunk.Id,
                                 LocalX = lx,
@@ -135,10 +134,9 @@ public static class WorldGenerator
                                 ObjectDefinitionId = TreeId
                             });
                         }
-                        // Boulders on stone (8% chance)
                         else if (tileId == Stone && objRng.Next(100) < 8)
                         {
-                            provider.SaveMapObject(new MapObject
+                            allObjects.Add(new MapObject
                             {
                                 MapChunkId = chunk.Id,
                                 LocalX = lx,
@@ -150,6 +148,8 @@ public static class WorldGenerator
                 }
             }
         }
+
+        provider.SaveMapObjects(allObjects);
     }
 
     private static void GenerateHeightMap(byte[,] heightMap, int width, int height, byte[,] terrain, int seed)
