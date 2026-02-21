@@ -20,6 +20,7 @@ public static class SeedData
         SeedItemTypes(modelBuilder);
         SeedItems(modelBuilder);
         SeedMerchantStock(modelBuilder);
+        SeedInspectDescriptions(modelBuilder);
     }
 
     private static void SeedCharacterClasses(ModelBuilder modelBuilder)
@@ -122,9 +123,9 @@ public static class SeedData
         modelBuilder.Entity<TileDefinition>().HasData(
             new TileDefinition { Id = 1, Name = "Grass", Description = "Lush green grass.", ColorHex = "#228B22", IsWalkable = true, BaseMovementCost = 1.0f },
             new TileDefinition { Id = 2, Name = "Water", Description = "Deep water.", ColorHex = "#1E5AC8", IsWalkable = false, BaseMovementCost = 0f },
-            new TileDefinition { Id = 3, Name = "Stone", Description = "Solid stone ground.", ColorHex = "#808080", IsWalkable = true, BaseMovementCost = 0.8f },
-            new TileDefinition { Id = 4, Name = "Sand", Description = "Loose sandy ground.", ColorHex = "#D2B464", IsWalkable = true, BaseMovementCost = 1.3f },
-            new TileDefinition { Id = 5, Name = "Dark Grass", Description = "Dense dark vegetation.", ColorHex = "#146414", IsWalkable = true, BaseMovementCost = 1.1f }
+            new TileDefinition { Id = 3, Name = "Sand", Description = "Loose sandy ground.", ColorHex = "#D2B464", IsWalkable = true, BaseMovementCost = 1.3f },
+            new TileDefinition { Id = 4, Name = "Stone", Description = "Solid stone ground.", ColorHex = "#808080", IsWalkable = true, BaseMovementCost = 0.8f },
+            new TileDefinition { Id = 5, Name = "Dirt", Description = "Packed earth and dried mud.", ColorHex = "#8B7355", IsWalkable = true, BaseMovementCost = 1.1f }
         );
     }
 
@@ -465,6 +466,101 @@ public static class SeedData
             new MerchantStock { Id = 18, NpcName = "Merchant", ItemId = 19, Quantity = 1, PriceMultiplier = 1.1m }, // Iron Greaves
             new MerchantStock { Id = 19, NpcName = "Merchant", ItemId = 20, Quantity = 1, PriceMultiplier = 1.1m },  // Iron Boots
             new MerchantStock { Id = 20, NpcName = "Merchant", ItemId = 21, Quantity = 1, PriceMultiplier = 1.0m }   // Dunedain Amulet
+        );
+    }
+
+    private static void SeedInspectDescriptions(ModelBuilder modelBuilder)
+    {
+        // ========== INSPECT DESCRIPTIONS ==========
+        modelBuilder.Entity<InspectDescription>().HasData(
+            // --- Tiles ---
+            new InspectDescription { Id = 1, TargetType = "Tile", TargetKey = "1", Priority = 0,
+                Text = "A carpet of wild grass stretches before you, bending gently in the breeze. Small wildflowers dot the green expanse — white clover, yellow buttercup, the occasional purple thistle. The earth beneath feels soft and yielding, well-watered by the rains that sweep through this valley." },
+            new InspectDescription { Id = 2, TargetType = "Tile", TargetKey = "2", Priority = 0,
+                Text = "Dark water stretches before you, its surface broken by slow, lazy ripples. The depth is impossible to gauge — it could be ankle-deep or bottomless. Reeds cluster along the edges, and you catch the silver flash of small fish darting beneath the surface." },
+            new InspectDescription { Id = 3, TargetType = "Tile", TargetKey = "3", Priority = 0,
+                Text = "Fine sand shifts beneath your feet, golden-brown and warm. The grains are surprisingly uniform — this was once a riverbed, perhaps, or the shore of some long-vanished lake. Walking here is slow going, each step sinking slightly before finding purchase." },
+            new InspectDescription { Id = 4, TargetType = "Tile", TargetKey = "4", Priority = 0,
+                Text = "Bare stone lies exposed here, worn smooth by centuries of wind and rain. Thin cracks spider across the surface, and in places you can see where ancient geological forces thrust this bedrock upward. Your boots ring hollow against the solid ground." },
+            new InspectDescription { Id = 5, TargetType = "Tile", TargetKey = "5", Priority = 0,
+                Text = "Hard-packed earth stretches underfoot, cracked and dry. Boot prints and cart ruts score the surface — this ground has seen heavy use. A thin layer of dust rises with each step, carrying the dry mineral smell of well-trodden soil." },
+
+            // --- Objects ---
+            new InspectDescription { Id = 10, TargetType = "Object", TargetKey = "1", Priority = 0,
+                Text = "A gnarled tree rises from the earth, its trunk thick with age and its branches spread wide overhead. Rough bark is patterned with lichens and moss, and the roots grip the soil like an old man's fingers. Birds have nested in the upper branches — you can hear their faint calls." },
+            new InspectDescription { Id = 11, TargetType = "Object", TargetKey = "2", Priority = 0,
+                Text = "A massive boulder squats on the ground, half-buried in the earth. Its surface is weathered and pitted, streaked with veins of darker mineral. It would take a team of oxen to move this stone — or perhaps it was placed here deliberately, long ago, for reasons lost to time." },
+            new InspectDescription { Id = 12, TargetType = "Object", TargetKey = "3", Priority = 0,
+                Text = "A wall of fitted stone blocks your path, each block carefully cut and mortared into place. The craftsmanship speaks of an older age — these stones have stood for generations. In places the mortar has crumbled, but the wall remains solid and unyielding." },
+
+            // --- Guard ---
+            new InspectDescription { Id = 20, TargetType = "Npc", TargetKey = "Guard", Priority = 0,
+                Text = "A tall figure in worn but well-maintained chainmail stands at attention, one hand resting on the pommel of a sheathed longsword. His face is weathered by years of outdoor duty, eyes constantly scanning the horizon. A faded tabard marks him as part of the local garrison — one of the few who still take their post seriously." },
+            new InspectDescription { Id = 21, TargetType = "Npc", TargetKey = "Guard", Priority = 5,
+                Text = "The guard nods in recognition as you approach, his posture relaxing slightly. He still keeps one hand near his weapon — old habits — but his expression is warmer now. \"Back again?\" his stance seems to say. You've earned a measure of trust from this watchful soldier." },
+            new InspectDescription { Id = 22, TargetType = "Npc", TargetKey = "Guard", Priority = 10,
+                Text = "The guard straightens when he sees you, and you catch something new in his expression — respect. Word of your deeds has reached him. He inclines his head slightly, a gesture that says more than words. In the quiet hierarchy of soldiers, you have been recognized." },
+
+            // --- Merchant ---
+            new InspectDescription { Id = 25, TargetType = "Npc", TargetKey = "Merchant", Priority = 0,
+                Text = "A shrewd-eyed trader stands behind an array of carefully displayed wares, fingers absently counting coins in a leather pouch. His clothing is finer than you'd expect for this outpost — silk-lined cuffs, polished brass buttons. He watches every passerby with the calculating gaze of someone who knows the price of everything." },
+            new InspectDescription { Id = 26, TargetType = "Npc", TargetKey = "Merchant", Priority = 5,
+                Text = "The merchant's face brightens as he recognizes a paying customer. His manner is warmer now, more solicitous — you've proven yourself someone worth dealing with. He subtly angles his best merchandise in your direction, a small smile playing at the corners of his mouth." },
+            new InspectDescription { Id = 27, TargetType = "Npc", TargetKey = "Merchant", Priority = 5,
+                Text = "Something has shifted in the merchant's bearing. He catches your eye and gives an almost imperceptible nod, as if acknowledging a shared secret. Behind his usual wares, you notice a locked cabinet you hadn't seen before — its wood dark with age, its brass fittings inscribed with faint symbols." },
+
+            // --- Mage ---
+            new InspectDescription { Id = 30, TargetType = "Npc", TargetKey = "Mage", Priority = 0,
+                Text = "A robed figure leans heavily against a gnarled staff, face drawn with pain. His traveling cloak is torn and bloodstained, and you can see where crude bandages have been hastily wrapped around his midsection. Despite his injuries, his eyes burn with an unsettling intelligence — this is no ordinary wanderer." },
+            new InspectDescription { Id = 31, TargetType = "Npc", TargetKey = "Mage", Priority = 5,
+                Text = "The mage looks up as you approach, recognition flickering across his pain-creased features. He seems relieved to see a familiar face in this dangerous place. His wounds are still grievous, but there is hope in his eyes now — hope that was not there before you spoke with him." },
+            new InspectDescription { Id = 32, TargetType = "Npc", TargetKey = "Mage", Priority = 10,
+                Text = "Color has returned to the mage's cheeks, and he stands a little straighter than before. The healing potion has done its work — the worst of his wounds have closed, though he still moves gingerly. His eyes are clearer now, sharp with renewed purpose. He clutches his staff with growing strength." },
+            new InspectDescription { Id = 33, TargetType = "Npc", TargetKey = "Mage", Priority = 15,
+                Text = "The mage stands tall and whole, his injuries fully healed and his power restored. Arcane energy crackles faintly along his staff, and his robes — once torn and bloodied — have been mended with visible skill. He radiates quiet authority, and when he speaks, the air itself seems to listen." },
+
+            // --- Mercenary (alive) ---
+            new InspectDescription { Id = 40, TargetType = "Npc", TargetKey = "Mercenary", Priority = 0,
+                Text = "A broad-shouldered warrior watches your approach with cold, calculating eyes. Iron plates are riveted over scarred leather, and a heavy mace hangs at his belt with the ease of long familiarity. Everything about his bearing suggests violence held in check — barely. This is someone who kills for coin and feels nothing about it." },
+
+            // --- Mercenary (dead) ---
+            new InspectDescription { Id = 41, TargetType = "Npc", TargetKey = "Mercenary (Dead)", Priority = 0,
+                Text = "The mercenary lies where he fell, his heavy armor doing nothing to cushion his final collapse. His eyes stare at nothing, and the mace has rolled from his slack fingers. Among his belongings, something glints — an ornate key, far too fine for a common sellsword to possess." },
+
+            // --- Bandit (alive) ---
+            new InspectDescription { Id = 45, TargetType = "Npc", TargetKey = "Bandit", Priority = 0,
+                Text = "A lean, wiry figure lurks at the edge of the path, hand never far from a notched blade. His clothes are a patchwork of stolen garments, and a crude mask of dark cloth hides the lower half of his face. He watches you with the hungry patience of a predator sizing up its prey." },
+
+            // --- Bandit (dead) ---
+            new InspectDescription { Id = 46, TargetType = "Npc", TargetKey = "Bandit (Dead)", Priority = 0,
+                Text = "The bandit lies crumpled in the dirt, his stolen finery splayed around him like the plumage of a fallen bird. The mask has slipped, revealing a surprisingly young face beneath — barely old enough to grow a beard. Whatever drove him to this life, it ended here." }
+        );
+
+        // ========== INSPECT CONDITIONS ==========
+        modelBuilder.Entity<InspectCondition>().HasData(
+            // Guard - after talking (Id 21): requires talked_to_guard
+            new InspectCondition { Id = 1, InspectDescriptionId = 21,
+                ConditionType = ConditionType.FlagSet, Value = "talked_to_guard" },
+            // Guard - quest complete (Id 22): requires quest_done_retrieve_key
+            new InspectCondition { Id = 2, InspectDescriptionId = 22,
+                ConditionType = ConditionType.FlagSet, Value = "quest_done_retrieve_key" },
+
+            // Merchant - after buying amulet (Id 26): requires bought_amulet
+            new InspectCondition { Id = 3, InspectDescriptionId = 26,
+                ConditionType = ConditionType.FlagSet, Value = "bought_amulet" },
+            // Merchant - arcane access (Id 27): requires merchant_arcane_access
+            new InspectCondition { Id = 4, InspectDescriptionId = 27,
+                ConditionType = ConditionType.FlagSet, Value = "merchant_arcane_access" },
+
+            // Mage - after talking (Id 31): requires talked_to_mage
+            new InspectCondition { Id = 5, InspectDescriptionId = 31,
+                ConditionType = ConditionType.FlagSet, Value = "talked_to_mage" },
+            // Mage - after healing (Id 32): requires mage_healed
+            new InspectCondition { Id = 6, InspectDescriptionId = 32,
+                ConditionType = ConditionType.FlagSet, Value = "mage_healed" },
+            // Mage - quest complete (Id 33): requires quest_done_retrieve_key
+            new InspectCondition { Id = 7, InspectDescriptionId = 33,
+                ConditionType = ConditionType.FlagSet, Value = "quest_done_retrieve_key" }
         );
     }
 }

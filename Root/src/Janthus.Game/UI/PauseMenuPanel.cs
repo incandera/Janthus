@@ -35,23 +35,44 @@ public class PauseMenuPanel : UIPanel
             _selectedIndex = (_selectedIndex + 1) % _options.Length;
         }
 
+        // Mouse click to select and activate
+        if (input.IsLeftClickPressed() && Bounds.Contains(input.MousePosition))
+        {
+            var itemStartY = Bounds.Y + 60; // after title (20 + 40)
+            var localY = input.MousePosition.Y - itemStartY;
+            if (localY >= 0)
+            {
+                var clickedIndex = localY / 30;
+                if (clickedIndex >= 0 && clickedIndex < _options.Length)
+                {
+                    _selectedIndex = clickedIndex;
+                    ActivateSelected();
+                }
+            }
+        }
+
         if (input.IsKeyPressed(Keys.Enter))
         {
-            switch (_selectedIndex)
-            {
-                case 0: // Resume
-                    ResumeRequested = true;
-                    break;
-                case 1: // Save
-                    SaveRequested = true;
-                    break;
-                case 2: // Load
-                    LoadRequested = true;
-                    break;
-                case 3: // Quit
-                    QuitRequested = true;
-                    break;
-            }
+            ActivateSelected();
+        }
+    }
+
+    private void ActivateSelected()
+    {
+        switch (_selectedIndex)
+        {
+            case 0: // Resume
+                ResumeRequested = true;
+                break;
+            case 1: // Save
+                SaveRequested = true;
+                break;
+            case 2: // Load
+                LoadRequested = true;
+                break;
+            case 3: // Quit
+                QuitRequested = true;
+                break;
         }
     }
 

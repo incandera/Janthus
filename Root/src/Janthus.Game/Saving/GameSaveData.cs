@@ -8,6 +8,8 @@ public class GameSaveData
     public List<ActorSaveData> Npcs { get; set; } = new();
     public CameraSaveData Camera { get; set; }
     public List<FlagSaveData> GameFlags { get; set; } = new();
+    public Dictionary<string, byte[]> ChunkVisibility { get; set; } = new();
+    public float TimeOfDay { get; set; } = 10f;
 }
 
 public class ActorSaveData
@@ -29,6 +31,7 @@ public class ActorSaveData
     public int TileX { get; set; }
     public int TileY { get; set; }
     public bool IsAdversary { get; set; }
+    public int Facing { get; set; }
     public uint Color { get; set; }
     public List<InventorySaveData> Inventory { get; set; } = new();
     public List<EquipmentSaveData> Equipment { get; set; } = new();

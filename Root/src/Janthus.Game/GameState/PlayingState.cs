@@ -9,6 +9,7 @@ using Janthus.Game.World;
 using Janthus.Game.Actors;
 using Janthus.Game.Combat;
 using Janthus.Game.Conversation;
+using Janthus.Game.Rendering;
 using Janthus.Game.Saving;
 using Janthus.Game.UI;
 
@@ -29,6 +30,14 @@ public class PlayingState : IGameState
     private readonly CombatManager _combatManager;
     private bool _paused;
     private bool _gameOver;
+    private bool _resumedThisFrame;
+
+    private readonly DayNightCycle _dayNightCycle;
+    private readonly LightmapRenderer _lightmapRenderer;
+    private readonly List<LightSource> _lights = new();
+    private VisibilityMap _visibility;
+    private int _lastVisionTileX = -1;
+    private int _lastVisionTileY = -1;
 
     public bool IsPaused => _paused;
     public ChunkManager ChunkManager => _chunkManager;
@@ -37,6 +46,10 @@ public class PlayingState : IGameState
     public PlayerController PlayerController => _playerController;
     public List<NpcController> NpcControllers => _npcControllers;
     public UIManager UIManager => _uiManager;
+    public DayNightCycle DayNightCycle => _dayNightCycle;
+    public LightmapRenderer LightmapRenderer => _lightmapRenderer;
+    public List<LightSource> Lights => _lights;
+    public VisibilityMap Visibility => _visibility;
 
     public PlayingState(JanthusGame game, InputManager input, SpriteFont font,
                         ChunkManager chunkManager, IsometricRenderer renderer, Camera camera,
@@ -55,6 +68,24 @@ public class PlayingState : IGameState
         _conversationRunner = conversationRunner;
         _dataProvider = dataProvider;
         _combatManager = combatManager;
+
+        // Initialize day/night cycle and lightmap renderer
+        _dayNightCycle = new DayNightCycle();
+        _lightmapRenderer = new LightmapRenderer();
+        _lightmapRenderer.Initialize(game.GraphicsDevice);
+
+        // Initialize visibility map
+        _visibility = new VisibilityMap(chunkManager.WorldWidth, chunkManager.WorldHeight);
+
+        // Player light source
+        _lights.Add(new LightSource
+        {
+            Type = LightType.Actor,
+            Radius = 250f,
+            Color = new Color(255, 220, 160),
+            Intensity = 0.9f,
+            AttachedActor = playerController.Sprite
+        });
 
         // Wire save/load callbacks
         _uiManager.OnSaveSlot = slot =>
@@ -129,12 +160,21 @@ public class PlayingState : IGameState
             _uiManager.ToggleInventory();
         }
 
+        // Debug: T advances time of day by 1 hour
+        if (_input.IsKeyPressed(Keys.T))
+        {
+            _dayNightCycle.TimeOfDay = (_dayNightCycle.TimeOfDay + 1f) % 24f;
+            _lightmapRenderer.AmbientColor = _dayNightCycle.GetAmbientColor();
+            _lastVisionTileX = -1; // Force vision recalculation
+        }
+
         _uiManager.Update(gameTime, _input);
 
         if (_uiManager.ResumeRequested)
         {
             _uiManager.ResumeRequested = false;
             _paused = false;
+            _resumedThisFrame = true;
             _uiManager.ClosePauseMenu();
         }
 
@@ -160,7 +200,7 @@ public class PlayingState : IGameState
             return;
         }
 
-        if (!_paused)
+        if (!_paused && !_resumedThisFrame)
         {
             // Block all game-world interaction when any menu panel is open
             if (!_uiManager.IsAnyMenuVisible)
@@ -194,6 +234,13 @@ public class PlayingState : IGameState
             // Update chunk loading based on player position
             _chunkManager.UpdatePlayerPosition(_playerController.Sprite.TileX, _playerController.Sprite.TileY);
 
+            // Update day/night cycle
+            _dayNightCycle.Update((float)gameTime.ElapsedGameTime.TotalSeconds);
+            _lightmapRenderer.AmbientColor = _dayNightCycle.GetAmbientColor();
+
+            // Recalculate vision when player moves
+            RecalculateVision();
+
             _camera.Follow(_playerController.Sprite.VisualPosition, _renderer);
         }
 
@@ -202,6 +249,8 @@ public class PlayingState : IGameState
         {
             _camera.AdjustZoom(_input.ScrollDelta > 0 ? 0.1f : -0.1f);
         }
+
+        _resumedThisFrame = false;
     }
 
     private void HandleLeftClick()
@@ -209,7 +258,7 @@ public class PlayingState : IGameState
         if (!_input.IsLeftClickPressed()) return;
 
         var worldPos = _camera.ScreenToWorld(_input.MousePosition.ToVector2());
-        var tilePos = _renderer.ScreenToTile(worldPos);
+        var tilePos = _renderer.ScreenToTile(worldPos, _chunkManager);
 
         // Build list of all actor sprites for pathfinding (excluding player)
         var actorSprites = new List<ActorSprite>();
@@ -253,7 +302,7 @@ public class PlayingState : IGameState
             _uiManager.CloseContextMenu();
 
         var worldPos = _camera.ScreenToWorld(_input.MousePosition.ToVector2());
-        var tilePos = _renderer.ScreenToTile(worldPos);
+        var tilePos = _renderer.ScreenToTile(worldPos, _chunkManager);
         var screenPos = _input.MousePosition;
 
         // Check if clicking an actor (hit-test against rendered bounds)
@@ -269,7 +318,11 @@ public class PlayingState : IGameState
                     new List<string> { "Inspect", "Loot" },
                     index =>
                     {
-                        if (index == 1) // Loot
+                        if (index == 0) // Inspect
+                        {
+                            InspectNpc(deadNpc);
+                        }
+                        else if (index == 1) // Loot
                         {
                             StartLoot(deadNpc);
                         }
@@ -281,7 +334,11 @@ public class PlayingState : IGameState
                     new List<string> { "Inspect", "Attack" },
                     index =>
                     {
-                        if (index == 1) // Attack
+                        if (index == 0) // Inspect
+                        {
+                            InspectNpc(clickedNpc);
+                        }
+                        else if (index == 1) // Attack
                         {
                             _combatManager.InitiatePlayerAttack(_playerController.Sprite, clickedNpc);
                         }
@@ -290,11 +347,16 @@ public class PlayingState : IGameState
             else
             {
                 var npcName = clickedNpc.Label;
+                var npcSprite = clickedNpc;
                 _uiManager.ShowContextMenu(screenPos,
                     new List<string> { "Inspect", "Talk", "Trade" },
                     index =>
                     {
-                        if (index == 1) // Talk
+                        if (index == 0) // Inspect
+                        {
+                            InspectNpc(npcSprite);
+                        }
+                        else if (index == 1) // Talk
                         {
                             StartConversation(npcName);
                         }
@@ -307,18 +369,23 @@ public class PlayingState : IGameState
         }
         else
         {
+            var inspectTilePos = tilePos;
             _uiManager.ShowContextMenu(screenPos,
                 new List<string> { "Inspect", "Move Here" },
                 index =>
                 {
-                    if (index == 1) // Move Here
+                    if (index == 0) // Inspect
+                    {
+                        InspectTile(inspectTilePos);
+                    }
+                    else if (index == 1) // Move Here
                     {
                         var actorSprites = new List<ActorSprite>();
                         foreach (var npc in _npcControllers)
                             actorSprites.Add(npc.Sprite);
 
                         var start = new Point(_playerController.Sprite.TileX, _playerController.Sprite.TileY);
-                        var path = Pathfinder.FindPath(_chunkManager, start, tilePos, actorSprites);
+                        var path = Pathfinder.FindPath(_chunkManager, start, inspectTilePos, actorSprites);
                         if (path != null)
                         {
                             _playerController.ClearPath();
@@ -437,6 +504,46 @@ public class PlayingState : IGameState
         _uiManager.ShowLoot(player, npcActor, npcActor.Inventory);
     }
 
+    private void InspectNpc(ActorSprite sprite)
+    {
+        var player = _playerController.Sprite.DomainActor as PlayerCharacter;
+        var targetKey = sprite.Label;
+        if (sprite.DomainActor.Status == ActorStatus.Dead)
+            targetKey = $"{sprite.Label} (Dead)";
+
+        var text = InspectResolver.ResolveDescription(
+            _dataProvider, "Npc", targetKey, player, "Soldier");
+
+        _uiManager.ShowDialog(sprite.Label, text,
+            new List<string>(), null, isEndNode: true, onDismiss: () => { });
+    }
+
+    private void InspectTile(Point tilePos)
+    {
+        var player = _playerController.Sprite.DomainActor as PlayerCharacter;
+
+        // Check for object at this tile first
+        var objectDef = _chunkManager.GetObjectAt(tilePos.X, tilePos.Y);
+        if (objectDef != null)
+        {
+            var text = InspectResolver.ResolveDescription(
+                _dataProvider, "Object", objectDef.Id.ToString(), player, "Soldier");
+            _uiManager.ShowDialog(objectDef.Name, text,
+                new List<string>(), null, isEndNode: true, onDismiss: () => { });
+            return;
+        }
+
+        // Fall back to tile inspection
+        var tile = _chunkManager.GetTile(tilePos.X, tilePos.Y);
+        if (tile != null)
+        {
+            var text = InspectResolver.ResolveDescription(
+                _dataProvider, "Tile", tile.TileDefinitionId.ToString(), player, "Soldier");
+            _uiManager.ShowDialog(tile.Name, text,
+                new List<string>(), null, isEndNode: true, onDismiss: () => { });
+        }
+    }
+
     private void StartConversation(string npcName)
     {
         if (!_conversationRunner.TryStartConversation(npcName))
@@ -486,21 +593,49 @@ public class PlayingState : IGameState
         }
     }
 
+    private void RecalculateVision()
+    {
+        var px = _playerController.Sprite.TileX;
+        var py = _playerController.Sprite.TileY;
+        if (px == _lastVisionTileX && py == _lastVisionTileY) return;
+
+        _lastVisionTileX = px;
+        _lastVisionTileY = py;
+
+        _visibility.ClearVisible();
+
+        var baseRadius = 12;
+        var radius = (int)(baseRadius * _dayNightCycle.GetVisionRadiusMultiplier());
+        var viewerElevation = _chunkManager.GetElevation(px, py);
+
+        Shadowcaster.ComputeVisibility(
+            px, py, radius,
+            (x, y) =>
+            {
+                if (!_chunkManager.IsInBounds(x, y)) return true;
+                var obj = _chunkManager.GetObjectAt(x, y);
+                return obj != null && obj.BlocksLineOfSight;
+            },
+            (x, y) => _visibility.SetVisible(x, y),
+            (x, y) => _chunkManager.IsInBounds(x, y) ? _chunkManager.GetElevation(x, y) : 0,
+            viewerElevation);
+    }
+
+    public void SetTimeOfDay(float time)
+    {
+        _dayNightCycle.TimeOfDay = time;
+    }
+
     private ActorSprite FindNpcAtWorldPos(Vector2 worldPos)
     {
-        // Hit-test against each NPC's rendered bounding rect in world space.
-        // The actor body is a 16x24 rect drawn relative to TileToScreen:
-        //   X: screenPos.X + TileWidth/2 - 8  ..  + 8   (width 16)
-        //   Y: screenPos.Y - 24 + TileHeight/2  ..  screenPos.Y + TileHeight/2  (height 24)
-        // We widen the hit area slightly for easier clicking.
-        const int hitW = 24;
-        const int hitH = 30;
+        const int hitW = 48;
+        const int hitH = 60;
 
         foreach (var npc in _npcControllers)
         {
             var screenPos = npc.Sprite.VisualPosition;
-            var cx = screenPos.X + IsometricRenderer.TileWidth / 2f;
-            var bottom = screenPos.Y + IsometricRenderer.TileHeight / 2f;
+            var cx = screenPos.X + RenderConstants.TileWidth / 2f;
+            var bottom = screenPos.Y + RenderConstants.TileHeight / 2f;
 
             var hitRect = new Rectangle(
                 (int)(cx - hitW / 2),
@@ -530,7 +665,7 @@ public class PlayingState : IGameState
         {
             var s = sprite;
             var elev = _chunkManager.GetElevation(s.TileX, s.TileY);
-            var depth = (s.TileX + s.TileY) * 100 - elev * 10;
+            var depth = RenderConstants.CalculateDepth(s.TileX, s.TileY, elev);
             var isPlayer = s == _playerController.Sprite;
             renderItems.Add((depth, () => _renderer.DrawActor(spriteBatch, s, _chunkManager, _camera, isPlayer)));
         }
@@ -550,7 +685,7 @@ public class PlayingState : IGameState
                 if (wx < visMinX || wx > visMaxX || wy < visMinY || wy > visMaxY)
                     continue;
                 var elev = chunk.GetElevation(o.LocalX, o.LocalY);
-                var depth = (wx + wy) * 100 - elev * 10;
+                var depth = RenderConstants.CalculateDepth(wx, wy, elev);
                 renderItems.Add((depth, () => _renderer.DrawObject(spriteBatch, wx, wy, o.ObjectDefinitionId, elev)));
             }
         }

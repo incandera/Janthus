@@ -78,7 +78,7 @@ public class UIManager
             new Rectangle(10, viewport.Height - 180, 350, 150));
 
         _saveLoadPanel = new SaveLoadPanel(pixelTexture, font,
-            new Rectangle(viewport.Width / 2 - 200, viewport.Height / 2 - 120, 400, 240));
+            new Rectangle(viewport.Width / 2 - 200, viewport.Height / 2 - 150, 400, 300));
     }
 
     public void UpdateLayout(Viewport viewport)
@@ -89,7 +89,7 @@ public class UIManager
         _contextMenu.UpdateViewport(viewport);
         _tradePanel.Bounds = new Rectangle(viewport.Width / 2 - 350, viewport.Height / 2 - 250, 700, 500);
         _combatLogPanel.Bounds = new Rectangle(10, viewport.Height - 180, 350, 150);
-        _saveLoadPanel.Bounds = new Rectangle(viewport.Width / 2 - 200, viewport.Height / 2 - 120, 400, 240);
+        _saveLoadPanel.Bounds = new Rectangle(viewport.Width / 2 - 200, viewport.Height / 2 - 150, 400, 300);
     }
 
     public void SetPaused(bool paused) => _hud.SetPaused(paused);

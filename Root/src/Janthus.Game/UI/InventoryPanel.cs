@@ -58,6 +58,39 @@ public class InventoryPanel : UIPanel
             _selectedIndex = 0;
         }
 
+        // Mouse click on either section — switches tab and selects item in one action
+        if (input.IsLeftClickPressed() && Bounds.Contains(input.MousePosition))
+        {
+            var clickY = input.MousePosition.Y;
+
+            // Equipment items zone
+            var equipItemsY = Bounds.Y + PaddingTop + LineHeight + LineHeight + 8;
+            var equipItemsEnd = equipItemsY + DisplaySlots.Length * ItemLineHeight;
+
+            // Inventory items zone
+            var invSectionTop = equipItemsEnd + 12; // gap + separator
+            var invHeaderEnd = invSectionTop + LineHeight + 4;
+
+            if (clickY >= equipItemsY && clickY < equipItemsEnd)
+            {
+                var clickedIndex = (clickY - equipItemsY) / ItemLineHeight;
+                if (clickedIndex >= 0 && clickedIndex < DisplaySlots.Length)
+                {
+                    _inEquipmentSection = true;
+                    _selectedIndex = clickedIndex;
+                }
+            }
+            else if (clickY >= invHeaderEnd && _player.Inventory.Count > 0)
+            {
+                var clickedIndex = (clickY - invHeaderEnd) / ItemLineHeight;
+                if (clickedIndex >= 0 && clickedIndex < _player.Inventory.Count)
+                {
+                    _inEquipmentSection = false;
+                    _selectedIndex = clickedIndex;
+                }
+            }
+        }
+
         if (_inEquipmentSection)
         {
             UpdateEquipmentSection(input);
@@ -82,18 +115,6 @@ public class InventoryPanel : UIPanel
             CombatCalculator.Unequip(_player, _player.Inventory, slot);
         }
 
-        // Mouse click selection
-        if (input.IsLeftClickPressed() && Bounds.Contains(input.MousePosition))
-        {
-            var equipY = Bounds.Y + PaddingTop + LineHeight + LineHeight + 8;
-            var localY = input.MousePosition.Y - equipY;
-            if (localY >= 0)
-            {
-                var clickedIndex = localY / ItemLineHeight;
-                if (clickedIndex >= 0 && clickedIndex < DisplaySlots.Length)
-                    _selectedIndex = clickedIndex;
-            }
-        }
     }
 
     private void UpdateInventorySection(InputManager input)
@@ -131,20 +152,6 @@ public class InventoryPanel : UIPanel
             }
         }
 
-        // Mouse click selection
-        if (input.IsLeftClickPressed() && Bounds.Contains(input.MousePosition))
-        {
-            var equipSectionHeight = PaddingTop + LineHeight + LineHeight + 8 + DisplaySlots.Length * ItemLineHeight + 12;
-            var invHeaderY = Bounds.Y + equipSectionHeight;
-            var itemsY = invHeaderY + LineHeight + 4;
-            var localY = input.MousePosition.Y - itemsY;
-            if (localY >= 0)
-            {
-                var clickedIndex = localY / ItemLineHeight;
-                if (clickedIndex >= 0 && clickedIndex < _player.Inventory.Count)
-                    _selectedIndex = clickedIndex;
-            }
-        }
     }
 
     public override void Draw(SpriteBatch spriteBatch)

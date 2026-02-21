@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using Janthus.Model.Entities;
 using Janthus.Model.Enums;
+using Janthus.Game.Rendering;
 using Janthus.Game.World;
 
 namespace Janthus.Game.Actors;
@@ -13,6 +14,9 @@ public class ActorSprite
     public Color Color { get; set; }
     public string Label { get; set; }
     public bool IsAdversary { get; set; }
+    public FacingDirection Facing { get; set; } = FacingDirection.South;
+    public ActorAnimator Animator { get; set; }
+    public CharacterSpriteSheet SpriteSheet { get; set; }
 
     public Color EffectiveColor => DomainActor.Status == ActorStatus.Dead ? Color.DarkGray : Color;
 
@@ -29,16 +33,21 @@ public class ActorSprite
         TileY = tileY;
         Color = color;
         Label = label ?? domainActor.Name;
+        Animator = new ActorAnimator();
     }
 
     public void SetTilePosition(int newX, int newY, ChunkManager chunkManager)
     {
+        // Compute facing from movement delta
+        var dx = newX - TileX;
+        var dy = newY - TileY;
+        if (dx != 0 || dy != 0)
+            Facing = ComputeFacing(dx, dy);
+
         TileX = newX;
         TileY = newY;
         var elevation = chunkManager.GetElevation(newX, newY);
-        var screenX = (newX - newY) * (IsometricRenderer.TileWidth / 2);
-        var screenY = (newX + newY) * (IsometricRenderer.TileHeight / 2) - elevation * IsometricRenderer.HeightStep;
-        _targetPosition = new Vector2(screenX, screenY);
+        _targetPosition = RenderConstants.TileToScreen(newX, newY, elevation);
     }
 
     public void UpdateVisual(float deltaTime, float speedModifier)
@@ -48,8 +57,13 @@ public class ActorSprite
         if (dist < 0.5f)
         {
             VisualPosition = _targetPosition;
+            Animator.Play(AnimationType.Idle);
+            Animator.Update(deltaTime);
             return;
         }
+
+        Animator.Play(AnimationType.Walk);
+        Animator.Update(deltaTime);
 
         var moveAmount = BaseSpeed * speedModifier * deltaTime;
         if (moveAmount >= dist)
@@ -65,9 +79,21 @@ public class ActorSprite
     public void SnapVisualToTile(ChunkManager chunkManager)
     {
         var elevation = chunkManager.GetElevation(TileX, TileY);
-        var screenX = (TileX - TileY) * (IsometricRenderer.TileWidth / 2);
-        var screenY = (TileX + TileY) * (IsometricRenderer.TileHeight / 2) - elevation * IsometricRenderer.HeightStep;
-        VisualPosition = new Vector2(screenX, screenY);
+        VisualPosition = RenderConstants.TileToScreen(TileX, TileY, elevation);
         _targetPosition = VisualPosition;
+    }
+
+    private static FacingDirection ComputeFacing(int dx, int dy)
+    {
+        // Isometric direction mapping from tile movement delta
+        if (dx > 0 && dy > 0) return FacingDirection.South;
+        if (dx > 0 && dy == 0) return FacingDirection.SouthEast;
+        if (dx > 0 && dy < 0) return FacingDirection.East;
+        if (dx == 0 && dy < 0) return FacingDirection.NorthEast;
+        if (dx < 0 && dy < 0) return FacingDirection.North;
+        if (dx < 0 && dy == 0) return FacingDirection.NorthWest;
+        if (dx < 0 && dy > 0) return FacingDirection.West;
+        if (dx == 0 && dy > 0) return FacingDirection.SouthWest;
+        return FacingDirection.South;
     }
 }

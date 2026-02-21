@@ -27,6 +27,8 @@ public class JanthusDbContext : DbContext
     public DbSet<Quality> Qualities { get; set; }
     public DbSet<Material> Materials { get; set; }
     public DbSet<MerchantStock> MerchantStocks { get; set; }
+    public DbSet<InspectDescription> InspectDescriptions { get; set; }
+    public DbSet<InspectCondition> InspectConditions { get; set; }
 
     public JanthusDbContext(DbContextOptions<JanthusDbContext> options) : base(options) { }
 
@@ -199,6 +201,23 @@ public class JanthusDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.NpcName).IsRequired().HasMaxLength(100);
             entity.HasIndex(e => e.NpcName);
+        });
+
+        modelBuilder.Entity<InspectDescription>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.TargetType).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.TargetKey).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Text).IsRequired().HasMaxLength(2000);
+            entity.HasIndex(e => new { e.TargetType, e.TargetKey });
+            entity.Ignore(e => e.Conditions);
+        });
+
+        modelBuilder.Entity<InspectCondition>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Value).HasMaxLength(200);
+            entity.HasIndex(e => e.InspectDescriptionId);
         });
 
         SeedData.Apply(modelBuilder);

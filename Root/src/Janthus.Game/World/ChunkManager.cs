@@ -16,6 +16,7 @@ public class ChunkManager
 
     public int WorldWidth => _worldMap.ChunkCountX * _worldMap.ChunkSize;
     public int WorldHeight => _worldMap.ChunkCountY * _worldMap.ChunkSize;
+    public int ChunkSize => _worldMap.ChunkSize;
     public TileRegistry TileRegistry => _tileRegistry;
     public WorldMap WorldMap => _worldMap;
 
@@ -120,6 +121,18 @@ public class ChunkManager
     public bool IsInBounds(int worldX, int worldY)
     {
         return worldX >= 0 && worldX < WorldWidth && worldY >= 0 && worldY < WorldHeight;
+    }
+
+    public ObjectDefinition GetObjectAt(int worldX, int worldY)
+    {
+        var chunkX = worldX >> ChunkShift;
+        var chunkY = worldY >> ChunkShift;
+        var localX = worldX & ChunkMask;
+        var localY = worldY & ChunkMask;
+        var chunk = GetLoadedChunk(chunkX, chunkY);
+        var obj = chunk?.GetObject(localX, localY);
+        if (obj == null) return null;
+        return GetObjectDefinition(obj.ObjectDefinitionId);
     }
 
     public void UpdatePlayerPosition(int worldX, int worldY)

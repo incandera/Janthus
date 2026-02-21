@@ -12,6 +12,7 @@ using Janthus.Game.World;
 using Janthus.Game.Actors;
 using Janthus.Game.Combat;
 using Janthus.Game.Conversation;
+using Janthus.Game.Rendering;
 using Janthus.Game.Saving;
 using Janthus.Game.UI;
 
@@ -30,6 +31,18 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
 
     private GameDataRepository _repository;
     private PlayingState _playingState;
+    private AssetManager _assetManager;
+
+    private RenderTarget2D _sceneTarget;
+    private RenderTarget2D _lightmapTarget;
+
+    private static readonly BlendState MultiplyBlend = new()
+    {
+        ColorSourceBlend = Blend.DestinationColor,
+        ColorDestinationBlend = Blend.Zero,
+        AlphaSourceBlend = Blend.DestinationAlpha,
+        AlphaDestinationBlend = Blend.Zero
+    };
 
     public static readonly (int Width, int Height)[] Resolutions =
     {
@@ -91,6 +104,13 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
         context.Database.EnsureCreated();
         _repository = new GameDataRepository(context);
 
+        // Create render targets for lightmap pipeline
+        CreateRenderTargets();
+
+        // Load sprite assets (graceful fallback if missing)
+        _assetManager = new AssetManager();
+        _assetManager.LoadAll(GraphicsDevice, Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Content"));
+
         // Start at menu
         var menuState = new MenuState(this, _input, _font);
         _stateManager.PushState(menuState);
@@ -128,6 +148,11 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
 
         var renderer = new IsometricRenderer(_pixelTexture);
         renderer.SetFont(_font);
+        if (_assetManager != null)
+        {
+            if (_assetManager.TileAtlas != null) renderer.SetTileAtlas(_assetManager.TileAtlas);
+            if (_assetManager.ObjectAtlas != null) renderer.SetObjectAtlas(_assetManager.ObjectAtlas);
+        }
         var camera = new Camera(GraphicsDevice.Viewport);
 
         return (chunkManager, renderer, camera);
@@ -169,6 +194,7 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
         }
 
         var playerSprite = new ActorSprite(player, playerStartX, playerStartY, Color.Cyan, "Hero");
+        if (_assetManager?.PlayerSheet != null) playerSprite.SpriteSheet = _assetManager.PlayerSheet;
         playerSprite.SnapVisualToTile(chunkManager);
         var playerController = new PlayerController(playerSprite, chunkManager);
 
@@ -237,6 +263,7 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
             }
 
             var npcSprite = new ActorSprite(npc, npcX, npcY, def.color, def.name);
+            if (_assetManager?.DefaultNpcSheet != null) npcSprite.SpriteSheet = _assetManager.DefaultNpcSheet;
             npcSprite.SnapVisualToTile(chunkManager);
 
             // Calculate adversary relationship — force adversary for scenario combatants
@@ -384,6 +411,8 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
 
         var playerColor = new Color { PackedValue = playerData.Color };
         var playerSprite = new ActorSprite(player, playerData.TileX, playerData.TileY, playerColor, playerData.Name);
+        playerSprite.Facing = (FacingDirection)playerData.Facing;
+        if (_assetManager?.PlayerSheet != null) playerSprite.SpriteSheet = _assetManager.PlayerSheet;
         playerSprite.SnapVisualToTile(chunkManager);
         var playerController = new PlayerController(playerSprite, chunkManager);
 
@@ -428,6 +457,8 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
             var npcColor = new Color { PackedValue = npcData.Color };
             var npcSprite = new ActorSprite(npc, npcData.TileX, npcData.TileY, npcColor, npcData.Name);
             npcSprite.IsAdversary = npcData.IsAdversary;
+            npcSprite.Facing = (FacingDirection)npcData.Facing;
+            if (_assetManager?.DefaultNpcSheet != null) npcSprite.SpriteSheet = _assetManager.DefaultNpcSheet;
             npcSprite.SnapVisualToTile(chunkManager);
             npcControllers.Add(new NpcController(npcSprite, chunkManager));
         }
@@ -449,6 +480,22 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
         _playingState = new PlayingState(this, _input, _font, chunkManager, renderer, camera,
             playerController, npcControllers, uiManager, conversationRunner, _repository, combatManager);
         _playingState.Font = _font;
+
+        // Restore time of day
+        _playingState.SetTimeOfDay(saveData.TimeOfDay);
+
+        // Restore visibility
+        if (saveData.ChunkVisibility != null && _playingState.Visibility != null)
+        {
+            foreach (var kvp in saveData.ChunkVisibility)
+            {
+                var parts = kvp.Key.Split(',');
+                if (parts.Length == 2 && int.TryParse(parts[0], out var cx) && int.TryParse(parts[1], out var cy))
+                {
+                    _playingState.Visibility.LoadChunkVisibility(cx, cy, chunkManager.ChunkSize, kvp.Value);
+                }
+            }
+        }
 
         _stateManager.ChangeState(_playingState);
     }
@@ -510,16 +557,25 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
         return new Point(startX, startY);
     }
 
+    private void CreateRenderTargets()
+    {
+        _sceneTarget?.Dispose();
+        _lightmapTarget?.Dispose();
+        var vp = GraphicsDevice.Viewport;
+        _sceneTarget = new RenderTarget2D(GraphicsDevice, vp.Width, vp.Height);
+        _lightmapTarget = new RenderTarget2D(GraphicsDevice, vp.Width, vp.Height);
+    }
+
     private void ApplyResolution()
     {
         var (width, height) = Resolutions[_resolutionIndex];
         _graphics.PreferredBackBufferWidth = width;
         _graphics.PreferredBackBufferHeight = height;
         _graphics.ApplyChanges();
+        CreateRenderTargets();
 
         Window.Title = $"Janthus - {CurrentResolutionLabel}";
 
-        // Update UI layout and camera for new viewport
         if (_playingState != null)
         {
             _playingState.UIManager.UpdateLayout(GraphicsDevice.Viewport);
@@ -551,6 +607,7 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
     {
         _graphics.IsFullScreen = value;
         _graphics.ApplyChanges();
+        CreateRenderTargets();
 
         Window.Title = $"Janthus - {CurrentResolutionLabel}";
 
@@ -565,6 +622,7 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
     {
         _graphics.IsFullScreen = !_graphics.IsFullScreen;
         _graphics.ApplyChanges();
+        CreateRenderTargets();
 
         Window.Title = $"Janthus - {CurrentResolutionLabel}";
 
@@ -611,11 +669,18 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
 
     protected override void Draw(GameTime gameTime)
     {
-        GraphicsDevice.Clear(new Color(15, 15, 25));
-
-        // World rendering with camera transform
         if (_stateManager.CurrentState is PlayingState playing)
         {
+            var renderer = playing.Renderer;
+            var cm = playing.ChunkManager;
+            var vp = GraphicsDevice.Viewport;
+
+            playing.Camera.Follow(playing.PlayerController.Sprite.VisualPosition, renderer);
+
+            // Phase 1: Scene → _sceneTarget
+            GraphicsDevice.SetRenderTarget(_sceneTarget);
+            GraphicsDevice.Clear(new Color(15, 15, 25));
+
             _spriteBatch.Begin(
                 SpriteSortMode.Deferred,
                 BlendState.AlphaBlend,
@@ -623,17 +688,10 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
                 null, null, null,
                 playing.Camera.GetTransformMatrix());
 
-            var renderer = playing.Renderer;
-            playing.Camera.Follow(playing.PlayerController.Sprite.VisualPosition, renderer);
+            renderer.DrawMap(_spriteBatch, cm, playing.Camera, playing.Visibility);
 
-            // Draw map
-            var cm = playing.ChunkManager;
-            renderer.DrawMap(_spriteBatch, cm, playing.Camera);
-
-            // Unified depth-sorted render list: objects + actors
             var renderItems = new List<(int depth, Action draw)>();
 
-            // Add actors
             var allSprites = new List<ActorSprite> { playing.PlayerController.Sprite };
             foreach (var npc in playing.NpcControllers)
                 allSprites.Add(npc.Sprite);
@@ -641,13 +699,21 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
             foreach (var sprite in allSprites)
             {
                 var s = sprite;
+
+                // Skip actors on unexplored tiles
+                if (playing.Visibility != null)
+                {
+                    var vis = playing.Visibility.GetVisibility(s.TileX, s.TileY);
+                    if (vis == TileVisibility.Unexplored) continue;
+                    if (vis == TileVisibility.Explored && s != playing.PlayerController.Sprite) continue;
+                }
+
                 var elev = cm.GetElevation(s.TileX, s.TileY);
-                var depth = (s.TileX + s.TileY) * 100 - elev * 10;
+                var depth = RenderConstants.CalculateDepth(s.TileX, s.TileY, elev);
                 var isPlayer = s == playing.PlayerController.Sprite;
                 renderItems.Add((depth, () => renderer.DrawActor(_spriteBatch, s, cm, playing.Camera, isPlayer)));
             }
 
-            // Add objects from loaded chunks (filtered by visible range)
             var (visMinX, visMinY, visMaxX, visMaxY) = renderer.GetVisibleTileRange(playing.Camera, cm.WorldWidth, cm.WorldHeight);
             foreach (var chunk in cm.LoadedChunks)
             {
@@ -661,8 +727,15 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
                     var wy = worldOffsetY + o.LocalY;
                     if (wx < visMinX || wx > visMaxX || wy < visMinY || wy > visMaxY)
                         continue;
+
+                    if (playing.Visibility != null)
+                    {
+                        var vis = playing.Visibility.GetVisibility(wx, wy);
+                        if (vis == TileVisibility.Unexplored) continue;
+                    }
+
                     var elev = chunk.GetElevation(o.LocalX, o.LocalY);
-                    var depth = (wx + wy) * 100 - elev * 10;
+                    var depth = RenderConstants.CalculateDepth(wx, wy, elev);
                     renderItems.Add((depth, () => renderer.DrawObject(_spriteBatch, wx, wy, o.ObjectDefinitionId, elev)));
                 }
             }
@@ -673,16 +746,39 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
 
             _spriteBatch.End();
 
-            // UI without camera transform
-            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend,
-                SamplerState.PointClamp);
+            // Phase 2: Lightmap → _lightmapTarget
+            GraphicsDevice.SetRenderTarget(_lightmapTarget);
+            if (playing.LightmapRenderer != null)
+            {
+                playing.LightmapRenderer.Draw(_spriteBatch, playing.Camera, vp, playing.Lights);
+            }
+            else
+            {
+                GraphicsDevice.Clear(Color.White);
+            }
+
+            // Phase 3: Composite → backbuffer
+            GraphicsDevice.SetRenderTarget(null);
+            GraphicsDevice.Clear(new Color(15, 15, 25));
+
+            // Draw scene
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Opaque, SamplerState.PointClamp);
+            _spriteBatch.Draw(_sceneTarget, Vector2.Zero, Color.White);
+            _spriteBatch.End();
+
+            // Multiply lightmap over scene
+            _spriteBatch.Begin(SpriteSortMode.Deferred, MultiplyBlend, SamplerState.PointClamp);
+            _spriteBatch.Draw(_lightmapTarget, Vector2.Zero, Color.White);
+            _spriteBatch.End();
+
+            // Phase 4: UI → backbuffer (not affected by lighting)
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
             playing.UIManager.Draw(_spriteBatch);
 
             if (playing.IsPaused)
             {
-                var viewport = GraphicsDevice.Viewport;
                 _spriteBatch.Draw(_pixelTexture,
-                    new Rectangle(0, 0, viewport.Width, viewport.Height),
+                    new Rectangle(0, 0, vp.Width, vp.Height),
                     Color.Black * 0.3f);
             }
 
@@ -690,9 +786,8 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
         }
         else
         {
-            // Menu/other states
-            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend,
-                SamplerState.PointClamp);
+            GraphicsDevice.Clear(new Color(15, 15, 25));
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
             _stateManager.Draw(_spriteBatch);
             _spriteBatch.End();
         }
@@ -782,6 +877,7 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
             ' ' => new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
             '!' => new byte[] { 0, 0, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x00, 0x18, 0x18, 0, 0, 0 },
             '"' => new byte[] { 0, 0x66, 0x66, 0x66, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+            '\'' => new byte[] { 0, 0x18, 0x18, 0x18, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
             '#' => new byte[] { 0, 0, 0x6C, 0x6C, 0xFE, 0x6C, 0x6C, 0xFE, 0x6C, 0x6C, 0, 0, 0, 0 },
             '(' => new byte[] { 0, 0x0C, 0x18, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x18, 0x0C, 0, 0, 0 },
             ')' => new byte[] { 0, 0x30, 0x18, 0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x18, 0x30, 0, 0, 0 },

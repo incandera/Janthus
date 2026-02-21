@@ -48,6 +48,9 @@ public interface IGameDataProvider
     Item GetItemByName(string name);
     List<MerchantStock> GetMerchantStock(string npcName);
 
+    // Inspect descriptions
+    List<InspectDescription> GetInspectDescriptions(string targetType, string targetKey);
+
     // Game flags
     List<GameFlag> GetGameFlags();
     GameFlag GetGameFlag(string name);

@@ -23,6 +23,8 @@ public class GameDataRepository : IGameDataProvider
     private List<ItemType> _itemTypes;
     private List<Item> _items;
     private List<MerchantStock> _merchantStock;
+    private List<InspectDescription> _inspectDescriptions;
+    private List<InspectCondition> _inspectConditions;
 
     public GameDataRepository(JanthusDbContext context)
     {
@@ -267,6 +269,25 @@ public class GameDataRepository : IGameDataProvider
     {
         _merchantStock ??= _context.MerchantStocks.ToList();
         return _merchantStock.Where(s => s.NpcName == npcName).ToList();
+    }
+
+    public List<InspectDescription> GetInspectDescriptions(string targetType, string targetKey)
+    {
+        _inspectDescriptions ??= _context.InspectDescriptions.ToList();
+        _inspectConditions ??= _context.InspectConditions.ToList();
+
+        var descriptions = _inspectDescriptions
+            .Where(d => d.TargetType == targetType && d.TargetKey == targetKey)
+            .OrderByDescending(d => d.Priority)
+            .ToList();
+
+        foreach (var desc in descriptions)
+        {
+            desc.Conditions = _inspectConditions
+                .Where(c => c.InspectDescriptionId == desc.Id).ToList();
+        }
+
+        return descriptions;
     }
 
     public List<GameFlag> GetGameFlags()

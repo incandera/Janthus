@@ -8,9 +8,9 @@ public static class WorldGenerator
     // Tile definition IDs matching seed data
     private const byte Grass = 1;
     private const byte Water = 2;
-    private const byte Stone = 3;
-    private const byte Sand = 4;
-    private const byte DarkGrass = 5;
+    private const byte Sand = 3;
+    private const byte Stone = 4;
+    private const byte Dirt = 5;
 
     public static void Generate(WorldMap worldMap, IGameDataProvider provider)
     {
@@ -51,12 +51,12 @@ public static class WorldGenerator
                     continue;
                 }
 
-                // Random terrain distribution: 60% Grass, 20% DarkGrass, 15% Sand, 5% Stone
+                // Random terrain distribution: 60% Grass, 20% Dirt, 15% Sand, 5% Stone
                 var roll = random.Next(100);
                 if (roll < 60)
                     terrain[wx, wy] = Grass;
                 else if (roll < 80)
-                    terrain[wx, wy] = DarkGrass;
+                    terrain[wx, wy] = Dirt;
                 else if (roll < 95)
                     terrain[wx, wy] = Sand;
                 else
@@ -124,7 +124,7 @@ public static class WorldGenerator
                         var wy = cy * chunkSize + ly;
                         var tileId = terrain[wx, wy];
 
-                        if ((tileId == Grass || tileId == DarkGrass) && objRng.Next(100) < 10)
+                        if ((tileId == Grass || tileId == Dirt) && objRng.Next(100) < 10)
                         {
                             allObjects.Add(new MapObject
                             {

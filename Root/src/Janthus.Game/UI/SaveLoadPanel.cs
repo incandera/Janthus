@@ -88,6 +88,19 @@ public class SaveLoadPanel : UIPanel
                 }
             }
         }
+
+        // X key to delete a save
+        if (input.IsKeyPressed(Keys.X))
+        {
+            var slot = _slots[_selectedIndex];
+            if (slot.Exists)
+            {
+                SaveManager.DeleteSlot(slot.Slot);
+                _slots = SaveManager.GetSlotSummaries();
+                _statusMessage = "Deleted.";
+                _statusTimer = 2.0;
+            }
+        }
     }
 
     public override void Draw(SpriteBatch spriteBatch)
@@ -142,7 +155,7 @@ public class SaveLoadPanel : UIPanel
 
         // Hints
         y = Bounds.Bottom - 30;
-        var hint = "Enter: Select   Escape: Cancel";
+        var hint = "Enter: Select   X: Delete   Esc: Cancel";
         var hintSize = Font.MeasureString(hint);
         spriteBatch.DrawString(Font, hint, new Vector2(x - hintSize.X / 2, y), Color.Gray);
     }

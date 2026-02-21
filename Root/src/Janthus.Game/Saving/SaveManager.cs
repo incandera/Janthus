@@ -5,13 +5,14 @@ using Janthus.Model.Enums;
 using Janthus.Model.Services;
 using Janthus.Game.Actors;
 using Janthus.Game.GameState;
+using Janthus.Game.Rendering;
 using Janthus.Game.World;
 
 namespace Janthus.Game.Saving;
 
 public static class SaveManager
 {
-    public const int MaxSlots = 3;
+    public const int MaxSlots = 5;
 
     private static readonly string SaveDirectory =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Janthus", "saves");
@@ -49,6 +50,26 @@ public static class SaveManager
             saveData.GameFlags.Add(new FlagSaveData { Name = flag.Name, Value = flag.Value });
         }
 
+        // Save time of day
+        if (state.DayNightCycle != null)
+            saveData.TimeOfDay = state.DayNightCycle.TimeOfDay;
+
+        // Save chunk visibility
+        if (state.Visibility != null)
+        {
+            var chunkSize = state.ChunkManager.ChunkSize;
+            var chunksX = state.ChunkManager.WorldWidth / chunkSize;
+            var chunksY = state.ChunkManager.WorldHeight / chunkSize;
+            for (int cy = 0; cy < chunksY; cy++)
+            {
+                for (int cx = 0; cx < chunksX; cx++)
+                {
+                    var key = $"{cx},{cy}";
+                    saveData.ChunkVisibility[key] = state.Visibility.GetChunkVisibility(cx, cy, chunkSize);
+                }
+            }
+        }
+
         return saveData;
     }
 
@@ -78,6 +99,20 @@ public static class SaveManager
         catch
         {
             return null;
+        }
+    }
+
+    public static void DeleteSlot(int slot)
+    {
+        try
+        {
+            var path = GetSlotPath(slot);
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch
+        {
+            // Non-critical
         }
     }
 
@@ -150,6 +185,7 @@ public static class SaveManager
             TileX = sprite.TileX,
             TileY = sprite.TileY,
             IsAdversary = sprite.IsAdversary,
+            Facing = (int)sprite.Facing,
             Color = sprite.Color.PackedValue
         };
 
