@@ -158,7 +158,8 @@ public static class SeedData
             new Conversation { Id = 4, NpcName = "Mage", Title = "Mage - Wounded Intro", Priority = 10, EntryNodeId = 20, IsRepeatable = false },
             new Conversation { Id = 5, NpcName = "Mage", Title = "Mage - Health Potion", Priority = 5, EntryNodeId = 25, IsRepeatable = false },
             new Conversation { Id = 6, NpcName = "Mage", Title = "Mage - Quest Active", Priority = 3, EntryNodeId = 30, IsRepeatable = true },
-            new Conversation { Id = 7, NpcName = "Mage", Title = "Mage - Quest Complete", Priority = 15, EntryNodeId = 32, IsRepeatable = false }
+            new Conversation { Id = 7, NpcName = "Mage", Title = "Mage - Quest Complete", Priority = 15, EntryNodeId = 32, IsRepeatable = false },
+            new Conversation { Id = 8, NpcName = "Mage", Title = "Mage - Join Party", Priority = 20, EntryNodeId = 35, IsRepeatable = false }
         );
 
         // ========== NODES ==========
@@ -228,6 +229,18 @@ public static class SeedData
                 Text = "You have it! The Key of Stratholme! I cannot thank you enough. You have saved not only my life's work, but perhaps the entire region." },
             new ConversationNode { Id = 33, ConversationId = 7, SpeakerName = "Mage",
                 Text = "Please, take this gold as a reward. You have more than earned it. May we meet again under better circumstances.",
+                IsEndNode = true },
+
+            // --- Mage - Join Party (Conv 8) ---
+            new ConversationNode { Id = 35, ConversationId = 8, SpeakerName = "Mage",
+                Text = "I have been reflecting on what you did for me. Retrieving the Key, tending to my wounds... I owe you a great debt." },
+            new ConversationNode { Id = 36, ConversationId = 8, SpeakerName = "Mage",
+                Text = "The road ahead will only grow more dangerous. I may not be a warrior, but my arcane knowledge could prove useful. Would you allow me to travel with you?" },
+            new ConversationNode { Id = 37, ConversationId = 8, SpeakerName = "Mage",
+                Text = "Then it is settled! Together we shall face whatever lies ahead. Lead on, friend.",
+                IsEndNode = true },
+            new ConversationNode { Id = 38, ConversationId = 8, SpeakerName = "Mage",
+                Text = "I understand. Should you change your mind, you know where to find me.",
                 IsEndNode = true }
         );
 
@@ -286,7 +299,15 @@ public static class SeedData
             // --- Mage - Quest Complete (Conv 7) ---
             // Node 32 responses
             new ConversationResponse { Id = 40, NodeId = 32, Text = "I'm glad I could help.", NextNodeId = 33, SortOrder = 1 },
-            new ConversationResponse { Id = 41, NodeId = 32, Text = "It was a tough fight.", NextNodeId = 33, SortOrder = 2 }
+            new ConversationResponse { Id = 41, NodeId = 32, Text = "It was a tough fight.", NextNodeId = 33, SortOrder = 2 },
+
+            // --- Mage - Join Party (Conv 8) ---
+            // Node 35 responses
+            new ConversationResponse { Id = 45, NodeId = 35, Text = "What do you have in mind?", NextNodeId = 36, SortOrder = 1 },
+            new ConversationResponse { Id = 46, NodeId = 35, Text = "You owe me nothing.", NextNodeId = 36, SortOrder = 2 },
+            // Node 36 responses
+            new ConversationResponse { Id = 47, NodeId = 36, Text = "I would welcome your company.", NextNodeId = 37, SortOrder = 1 },
+            new ConversationResponse { Id = 48, NodeId = 36, Text = "I prefer to travel alone.", NextNodeId = 38, SortOrder = 2 }
         );
 
         // ========== CONDITIONS ==========
@@ -338,7 +359,13 @@ public static class SeedData
             new ConversationCondition { Id = 11, ConversationId = 7, ResponseId = 0,
                 ConditionType = ConditionType.FlagSet, Value = "key_retrieved" },
             new ConversationCondition { Id = 12, ConversationId = 7, ResponseId = 0,
-                ConditionType = ConditionType.FlagNotSet, Value = "quest_done_retrieve_key" }
+                ConditionType = ConditionType.FlagNotSet, Value = "quest_done_retrieve_key" },
+
+            // Mage - Join Party (Conv 8): requires quest complete AND not already in party
+            new ConversationCondition { Id = 14, ConversationId = 8, ResponseId = 0,
+                ConditionType = ConditionType.FlagSet, Value = "quest_done_retrieve_key" },
+            new ConversationCondition { Id = 15, ConversationId = 8, ResponseId = 0,
+                ConditionType = ConditionType.FlagNotSet, Value = "mage_in_party" }
         );
 
         // ========== ACTIONS ==========
@@ -395,7 +422,13 @@ public static class SeedData
             new ConversationAction { Id = 16, ResponseId = 41,
                 ActionType = ConversationActionType.GiveGold, Value = "200" },
             new ConversationAction { Id = 17, ResponseId = 41,
-                ActionType = ConversationActionType.GiveExperience, Value = "50" }
+                ActionType = ConversationActionType.GiveExperience, Value = "50" },
+
+            // Mage response 47 (welcome your company): recruit follower + set flag
+            new ConversationAction { Id = 19, ResponseId = 47,
+                ActionType = ConversationActionType.RecruitFollower, Value = "Mage" },
+            new ConversationAction { Id = 20, ResponseId = 47,
+                ActionType = ConversationActionType.SetFlag, Value = "mage_in_party" }
         );
     }
 
@@ -533,7 +566,11 @@ public static class SeedData
 
             // --- Bandit (dead) ---
             new InspectDescription { Id = 46, TargetType = "Npc", TargetKey = "Bandit (Dead)", Priority = 0,
-                Text = "The bandit lies crumpled in the dirt, his stolen finery splayed around him like the plumage of a fallen bird. The mask has slipped, revealing a surprisingly young face beneath — barely old enough to grow a beard. Whatever drove him to this life, it ended here." }
+                Text = "The bandit lies crumpled in the dirt, his stolen finery splayed around him like the plumage of a fallen bird. The mask has slipped, revealing a surprisingly young face beneath — barely old enough to grow a beard. Whatever drove him to this life, it ended here." },
+
+            // --- Mage (party member) ---
+            new InspectDescription { Id = 50, TargetType = "Npc", TargetKey = "Mage", Priority = 20,
+                Text = "The mage walks at your side, his staff tapping a steady rhythm against the earth. His injuries are long healed, and arcane energy crackles faintly about his fingers as he surveys the road ahead. There is a quiet confidence in his bearing now — the confidence of a man who has found purpose again. He is your ally, and the bond forged through hardship runs deep." }
         );
 
         // ========== INSPECT CONDITIONS ==========
@@ -560,7 +597,10 @@ public static class SeedData
                 ConditionType = ConditionType.FlagSet, Value = "mage_healed" },
             // Mage - quest complete (Id 33): requires quest_done_retrieve_key
             new InspectCondition { Id = 7, InspectDescriptionId = 33,
-                ConditionType = ConditionType.FlagSet, Value = "quest_done_retrieve_key" }
+                ConditionType = ConditionType.FlagSet, Value = "quest_done_retrieve_key" },
+            // Mage - party member (Id 50): requires mage_in_party
+            new InspectCondition { Id = 8, InspectDescriptionId = 50,
+                ConditionType = ConditionType.FlagSet, Value = "mage_in_party" }
         );
     }
 }

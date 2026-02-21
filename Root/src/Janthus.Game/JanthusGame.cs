@@ -346,8 +346,10 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
         var conversationRunner = new ConversationRunner(_repository, player, "Soldier");
 
         // Create playing state
+        var followerControllers = new List<FollowerController>();
         _playingState = new PlayingState(this, _input, _font, chunkManager, renderer, camera,
-            playerController, npcControllers, uiManager, conversationRunner, _repository, combatManager);
+            playerController, npcControllers, followerControllers, uiManager, conversationRunner,
+            _repository, combatManager);
         _playingState.Font = _font;
 
         // Center camera on player
@@ -416,8 +418,9 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
         playerSprite.SnapVisualToTile(chunkManager);
         var playerController = new PlayerController(playerSprite, chunkManager);
 
-        // Restore NPCs
+        // Restore NPCs and followers
         var npcControllers = new List<NpcController>();
+        var followerControllers = new List<FollowerController>();
         foreach (var npcData in saveData.Npcs)
         {
             var npcAlignment = new Alignment(
@@ -457,10 +460,15 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
             var npcColor = new Color { PackedValue = npcData.Color };
             var npcSprite = new ActorSprite(npc, npcData.TileX, npcData.TileY, npcColor, npcData.Name);
             npcSprite.IsAdversary = npcData.IsAdversary;
+            npcSprite.IsFollower = npcData.IsFollower;
             npcSprite.Facing = (FacingDirection)npcData.Facing;
             if (_assetManager?.DefaultNpcSheet != null) npcSprite.SpriteSheet = _assetManager.DefaultNpcSheet;
             npcSprite.SnapVisualToTile(chunkManager);
-            npcControllers.Add(new NpcController(npcSprite, chunkManager));
+
+            if (npcData.IsFollower)
+                followerControllers.Add(new FollowerController(npcSprite, chunkManager));
+            else
+                npcControllers.Add(new NpcController(npcSprite, chunkManager));
         }
 
         // Restore camera
@@ -478,7 +486,8 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
 
         // Create playing state
         _playingState = new PlayingState(this, _input, _font, chunkManager, renderer, camera,
-            playerController, npcControllers, uiManager, conversationRunner, _repository, combatManager);
+            playerController, npcControllers, followerControllers, uiManager, conversationRunner,
+            _repository, combatManager);
         _playingState.Font = _font;
 
         // Restore time of day
@@ -695,17 +704,20 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
             var allSprites = new List<ActorSprite> { playing.PlayerController.Sprite };
             foreach (var npc in playing.NpcControllers)
                 allSprites.Add(npc.Sprite);
+            foreach (var f in playing.FollowerControllers)
+                allSprites.Add(f.Sprite);
 
             foreach (var sprite in allSprites)
             {
                 var s = sprite;
 
-                // Skip actors on unexplored tiles
+                // Skip actors on unexplored tiles (followers and player always visible)
                 if (playing.Visibility != null)
                 {
+                    var isAlwaysVisible = s == playing.PlayerController.Sprite || s.IsFollower;
                     var vis = playing.Visibility.GetVisibility(s.TileX, s.TileY);
-                    if (vis == TileVisibility.Unexplored) continue;
-                    if (vis == TileVisibility.Explored && s != playing.PlayerController.Sprite) continue;
+                    if (vis == TileVisibility.Unexplored && !isAlwaysVisible) continue;
+                    if (vis == TileVisibility.Explored && !isAlwaysVisible) continue;
                 }
 
                 var elev = cm.GetElevation(s.TileX, s.TileY);

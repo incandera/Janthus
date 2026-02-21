@@ -20,6 +20,12 @@ public class ConversationRunner
     public List<ConversationResponse> AvailableResponses => _availableResponses ?? new();
     public bool IsEndNode => _currentNode?.IsEndNode ?? true;
 
+    public Action<string> OnRecruitFollower
+    {
+        get => _actionExecutor.OnRecruitFollower;
+        set => _actionExecutor.OnRecruitFollower = value;
+    }
+
     public ConversationRunner(IGameDataProvider dataProvider, PlayerCharacter player,
                               string playerClassName)
     {

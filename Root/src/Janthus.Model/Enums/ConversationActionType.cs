@@ -13,5 +13,6 @@ public enum ConversationActionType
     SetLawfulness,
     StartQuest,
     CompleteQuest,
-    GiveExperience
+    GiveExperience,
+    RecruitFollower
 }

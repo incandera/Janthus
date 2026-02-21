@@ -15,6 +15,10 @@ public class DialogPanel : UIPanel
     private Action _onDismiss;
     private bool _isEndNode;
 
+    private bool _consumedInput;
+
+    public bool ConsumedInput => _consumedInput;
+
     private const int PaddingX = 15;
     private const int PaddingTop = 10;
     private const int LineHeight = 18;
@@ -50,12 +54,14 @@ public class DialogPanel : UIPanel
 
     public override void Update(GameTime gameTime, InputManager input)
     {
+        _consumedInput = false;
         if (!IsVisible) return;
 
         if (_isEndNode || _responses.Count == 0)
         {
             if (input.IsKeyPressed(Keys.Enter) || input.IsLeftClickPressed())
             {
+                _consumedInput = true;
                 var dismiss = _onDismiss;
                 Hide();
                 dismiss?.Invoke();
@@ -79,6 +85,7 @@ public class DialogPanel : UIPanel
 
         if (input.IsLeftClickPressed() && Bounds.Contains(input.MousePosition))
         {
+            _consumedInput = true;
             var responseAreaY = GetResponseAreaY();
             var localY = input.MousePosition.Y - responseAreaY;
             var clickedIndex = localY / ResponseLineHeight;

@@ -70,7 +70,37 @@ public class CombatManager
         AddLogEntry($"Combat with {targetSprite.Label} begins!", Color.White);
     }
 
-    public void Update(GameTime gameTime, ActorSprite playerSprite, List<NpcController> npcControllers)
+    public void InitiateFollowerCombat(ActorSprite followerSprite, ActorSprite targetSprite)
+    {
+        if (targetSprite.DomainActor.Status == ActorStatus.Dead) return;
+        if (followerSprite.DomainActor.Status == ActorStatus.Dead) return;
+
+        // Check if already in combat with this target
+        foreach (var enc in _encounters)
+        {
+            if (enc.IsActive && enc.Attacker == followerSprite && enc.Defender == targetSprite)
+                return;
+        }
+
+        _encounters.Add(new CombatEncounter
+        {
+            Attacker = followerSprite,
+            Defender = targetSprite,
+            AttackTimer = 0.8f
+        });
+
+        _encounters.Add(new CombatEncounter
+        {
+            Attacker = targetSprite,
+            Defender = followerSprite,
+            AttackTimer = AttackInterval
+        });
+
+        AddLogEntry($"{followerSprite.Label} joins combat against {targetSprite.Label}!", Color.LightBlue);
+    }
+
+    public void Update(GameTime gameTime, ActorSprite playerSprite, List<NpcController> npcControllers,
+                       List<FollowerController> followerControllers = null)
     {
         var deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
@@ -82,27 +112,42 @@ public class CombatManager
                 if (!npc.Sprite.IsAdversary) continue;
                 if (npc.Sprite.DomainActor.Status == ActorStatus.Dead) continue;
 
-                // Already in combat with this NPC?
-                var alreadyEngaged = false;
+                // Already in combat with player?
+                var alreadyEngagedPlayer = false;
                 foreach (var enc in _encounters)
                 {
                     if (enc.IsActive &&
                         ((enc.Attacker == npc.Sprite && enc.Defender == playerSprite) ||
                          (enc.Attacker == playerSprite && enc.Defender == npc.Sprite)))
                     {
-                        alreadyEngaged = true;
+                        alreadyEngagedPlayer = true;
                         break;
                     }
                 }
-                if (alreadyEngaged) continue;
 
                 var dx = npc.Sprite.TileX - playerSprite.TileX;
                 var dy = npc.Sprite.TileY - playerSprite.TileY;
                 var dist = Math.Sqrt(dx * dx + dy * dy);
 
-                if (dist <= AggroRange)
+                if (!alreadyEngagedPlayer && dist <= AggroRange)
                 {
                     InitiatePlayerAttack(playerSprite, npc.Sprite);
+                }
+
+                // Engage nearby followers when adversary aggroes
+                if (followerControllers != null && dist <= AggroRange)
+                {
+                    foreach (var follower in followerControllers)
+                    {
+                        if (follower.Sprite.DomainActor.Status == ActorStatus.Dead) continue;
+
+                        var fdx = npc.Sprite.TileX - follower.Sprite.TileX;
+                        var fdy = npc.Sprite.TileY - follower.Sprite.TileY;
+                        var fdist = Math.Sqrt(fdx * fdx + fdy * fdy);
+                        if (fdist > AggroRange) continue;
+
+                        InitiateFollowerCombat(follower.Sprite, npc.Sprite);
+                    }
                 }
             }
         }

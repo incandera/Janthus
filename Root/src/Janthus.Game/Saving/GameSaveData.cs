@@ -31,6 +31,7 @@ public class ActorSaveData
     public int TileX { get; set; }
     public int TileY { get; set; }
     public bool IsAdversary { get; set; }
+    public bool IsFollower { get; set; }
     public int Facing { get; set; }
     public uint Color { get; set; }
     public List<InventorySaveData> Inventory { get; set; } = new();

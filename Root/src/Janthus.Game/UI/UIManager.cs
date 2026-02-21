@@ -40,6 +40,7 @@ public class UIManager
     public bool QuitRequested => _pauseMenuPanel.QuitRequested;
     public bool IsContextMenuVisible => _contextMenu.IsVisible;
     public bool ContextMenuConsumedInput => _contextMenu.ConsumedInput;
+    public bool DialogConsumedInput => _dialogPanel.ConsumedInput;
     public bool IsDialogVisible => _dialogPanel.IsVisible;
     public bool IsTradeVisible => _tradePanel.IsVisible;
     public bool IsInventoryVisible => _inventoryPanel.IsVisible;

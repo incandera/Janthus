@@ -45,6 +45,11 @@ public static class SaveManager
             saveData.Npcs.Add(BuildActorSaveData(npc.Sprite));
         }
 
+        foreach (var follower in state.FollowerControllers)
+        {
+            saveData.Npcs.Add(BuildActorSaveData(follower.Sprite));
+        }
+
         foreach (var flag in dataProvider.GetGameFlags())
         {
             saveData.GameFlags.Add(new FlagSaveData { Name = flag.Name, Value = flag.Value });
@@ -185,6 +190,7 @@ public static class SaveManager
             TileX = sprite.TileX,
             TileY = sprite.TileY,
             IsAdversary = sprite.IsAdversary,
+            IsFollower = sprite.IsFollower,
             Facing = (int)sprite.Facing,
             Color = sprite.Color.PackedValue
         };

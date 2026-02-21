@@ -9,6 +9,8 @@ public class ConversationActionExecutor
     private readonly IGameDataProvider _dataProvider;
     private readonly PlayerCharacter _player;
 
+    public Action<string> OnRecruitFollower { get; set; }
+
     public ConversationActionExecutor(IGameDataProvider dataProvider, PlayerCharacter player)
     {
         _dataProvider = dataProvider;
@@ -88,6 +90,10 @@ public class ConversationActionExecutor
 
             case ConversationActionType.GiveExperience:
                 System.Console.WriteLine($"[Action] Give {action.Value} XP");
+                break;
+
+            case ConversationActionType.RecruitFollower:
+                OnRecruitFollower?.Invoke(action.Value);
                 break;
 
             case ConversationActionType.None:

@@ -14,6 +14,7 @@ public class ActorSprite
     public Color Color { get; set; }
     public string Label { get; set; }
     public bool IsAdversary { get; set; }
+    public bool IsFollower { get; set; }
     public FacingDirection Facing { get; set; } = FacingDirection.South;
     public ActorAnimator Animator { get; set; }
     public CharacterSpriteSheet SpriteSheet { get; set; }

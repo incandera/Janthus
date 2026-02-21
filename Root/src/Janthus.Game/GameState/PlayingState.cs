@@ -28,6 +28,7 @@ public class PlayingState : IGameState
     private readonly ConversationRunner _conversationRunner;
     private readonly IGameDataProvider _dataProvider;
     private readonly CombatManager _combatManager;
+    private readonly List<FollowerController> _followerControllers;
     private bool _paused;
     private bool _gameOver;
     private bool _resumedThisFrame;
@@ -39,12 +40,14 @@ public class PlayingState : IGameState
     private int _lastVisionTileX = -1;
     private int _lastVisionTileY = -1;
 
+    public const int MaxPartySize = 4;
     public bool IsPaused => _paused;
     public ChunkManager ChunkManager => _chunkManager;
     public Camera Camera => _camera;
     public IsometricRenderer Renderer => _renderer;
     public PlayerController PlayerController => _playerController;
     public List<NpcController> NpcControllers => _npcControllers;
+    public List<FollowerController> FollowerControllers => _followerControllers;
     public UIManager UIManager => _uiManager;
     public DayNightCycle DayNightCycle => _dayNightCycle;
     public LightmapRenderer LightmapRenderer => _lightmapRenderer;
@@ -54,6 +57,7 @@ public class PlayingState : IGameState
     public PlayingState(JanthusGame game, InputManager input, SpriteFont font,
                         ChunkManager chunkManager, IsometricRenderer renderer, Camera camera,
                         PlayerController playerController, List<NpcController> npcControllers,
+                        List<FollowerController> followerControllers,
                         UIManager uiManager, ConversationRunner conversationRunner,
                         IGameDataProvider dataProvider, CombatManager combatManager)
     {
@@ -64,6 +68,7 @@ public class PlayingState : IGameState
         _camera = camera;
         _playerController = playerController;
         _npcControllers = npcControllers;
+        _followerControllers = followerControllers;
         _uiManager = uiManager;
         _conversationRunner = conversationRunner;
         _dataProvider = dataProvider;
@@ -99,6 +104,22 @@ public class PlayingState : IGameState
             if (data != null)
                 _game.StartFromSave(data);
         };
+
+        // Wire recruit follower callback
+        _conversationRunner.OnRecruitFollower = name => RecruitFollower(name);
+
+        // Add light sources for existing followers
+        foreach (var follower in _followerControllers)
+        {
+            _lights.Add(new LightSource
+            {
+                Type = LightType.Actor,
+                Radius = 200f,
+                Color = new Color(200, 200, 255),
+                Intensity = 0.7f,
+                AttachedActor = follower.Sprite
+            });
+        }
     }
 
     public void Enter() { }
@@ -208,13 +229,13 @@ public class PlayingState : IGameState
                 // Right-click always works — closes any open menu and opens a new one
                 HandleRightClick();
 
-                // Left-click only when context menu didn't consume this frame's input
-                if (!_uiManager.ContextMenuConsumedInput)
+                // Left-click only when context menu/dialog didn't consume this frame's input
+                if (!_uiManager.ContextMenuConsumedInput && !_uiManager.DialogConsumedInput)
                 {
                     HandleLeftClick();
                 }
 
-                if (!_uiManager.ContextMenuConsumedInput)
+                if (!_uiManager.ContextMenuConsumedInput && !_uiManager.DialogConsumedInput)
                     _playerController.Update(gameTime, _input);
             }
             if (!_uiManager.IsDialogVisible && !_uiManager.IsTradeVisible)
@@ -223,10 +244,23 @@ public class PlayingState : IGameState
                 {
                     npc.Update(gameTime, _combatManager.IsInCombat(npc.Sprite));
                 }
+
+                // Build combined actor list for follower pathfinding
+                var allActorsForFollowers = new List<ActorSprite> { _playerController.Sprite };
+                foreach (var npc in _npcControllers)
+                    allActorsForFollowers.Add(npc.Sprite);
+                foreach (var f in _followerControllers)
+                    allActorsForFollowers.Add(f.Sprite);
+
+                foreach (var follower in _followerControllers)
+                {
+                    follower.Update(gameTime, _playerController.Sprite, allActorsForFollowers,
+                        _combatManager.IsInCombat(follower.Sprite));
+                }
             }
 
             // Update combat system
-            _combatManager.Update(gameTime, _playerController.Sprite, _npcControllers);
+            _combatManager.Update(gameTime, _playerController.Sprite, _npcControllers, _followerControllers);
 
             // Check for quest item pickups (Key of Stratholme → key_retrieved flag)
             CheckQuestItemFlags();
@@ -264,6 +298,8 @@ public class PlayingState : IGameState
         var actorSprites = new List<ActorSprite>();
         foreach (var npc in _npcControllers)
             actorSprites.Add(npc.Sprite);
+        foreach (var f in _followerControllers)
+            actorSprites.Add(f.Sprite);
 
         var start = new Point(_playerController.Sprite.TileX, _playerController.Sprite.TileY);
 
@@ -328,6 +364,32 @@ public class PlayingState : IGameState
                         }
                     });
             }
+            else if (clickedNpc.IsFollower)
+            {
+                var followerName = clickedNpc.Label;
+                var followerSprite = clickedNpc;
+                _uiManager.ShowContextMenu(screenPos,
+                    new List<string> { "Inspect", "Talk", "Trade", "Dismiss" },
+                    index =>
+                    {
+                        if (index == 0) // Inspect
+                        {
+                            InspectNpc(followerSprite);
+                        }
+                        else if (index == 1) // Talk
+                        {
+                            StartConversation(followerName);
+                        }
+                        else if (index == 2) // Trade
+                        {
+                            StartTrade(followerName);
+                        }
+                        else if (index == 3) // Dismiss
+                        {
+                            DismissFollower(followerName);
+                        }
+                    });
+            }
             else if (clickedNpc.IsAdversary)
             {
                 _uiManager.ShowContextMenu(screenPos,
@@ -383,6 +445,8 @@ public class PlayingState : IGameState
                         var actorSprites = new List<ActorSprite>();
                         foreach (var npc in _npcControllers)
                             actorSprites.Add(npc.Sprite);
+                        foreach (var f in _followerControllers)
+                            actorSprites.Add(f.Sprite);
 
                         var start = new Point(_playerController.Sprite.TileX, _playerController.Sprite.TileY);
                         var path = Pathfinder.FindPath(_chunkManager, start, inspectTilePos, actorSprites);
@@ -398,26 +462,53 @@ public class PlayingState : IGameState
 
     private void StartTrade(string npcName)
     {
-        // Find the NPC controller for this NPC
-        NpcController npcController = null;
+        // Find the NPC controller for this NPC (check regular NPCs first, then followers)
+        NonPlayerCharacter npcActor = null;
+        bool isFollower = false;
+
         foreach (var npc in _npcControllers)
         {
             if (npc.Sprite.Label == npcName)
             {
-                npcController = npc;
+                npcActor = npc.Sprite.DomainActor as NonPlayerCharacter;
                 break;
             }
         }
 
-        if (npcController == null) return;
+        if (npcActor == null)
+        {
+            foreach (var f in _followerControllers)
+            {
+                if (f.Sprite.Label == npcName)
+                {
+                    npcActor = f.Sprite.DomainActor as NonPlayerCharacter;
+                    isFollower = true;
+                    break;
+                }
+            }
+        }
 
-        var npcActor = npcController.Sprite.DomainActor as NonPlayerCharacter;
         if (npcActor == null) return;
 
-        // Load merchant stock from DB
+        // For followers without merchant stock, trade directly from their inventory
         var stockEntries = _dataProvider.GetMerchantStock(npcName);
         if (stockEntries.Count == 0)
         {
+            if (isFollower)
+            {
+                // Followers trade their personal inventory directly
+                if (npcActor.Inventory.Count == 0)
+                {
+                    _uiManager.ShowDialog(npcName, $"{npcName} has nothing to trade.",
+                        new List<string>(), null, isEndNode: true, onDismiss: () => { });
+                    return;
+                }
+
+                var player = _playerController.Sprite.DomainActor as PlayerCharacter;
+                _uiManager.ShowTrade(player, npcActor, npcActor.Inventory, _dataProvider);
+                return;
+            }
+
             _uiManager.ShowDialog(npcName, $"{npcName} has nothing to trade.",
                 new List<string>(), null, isEndNode: true, onDismiss: () => { });
             return;
@@ -455,8 +546,8 @@ public class PlayingState : IGameState
         foreach (var inv in merchantInventory)
             npcActor.Inventory.Add(new InventoryItem(inv.Item, inv.Quantity));
 
-        var player = _playerController.Sprite.DomainActor as PlayerCharacter;
-        _uiManager.ShowTrade(player, npcActor, npcActor.Inventory, _dataProvider);
+        var playerActor = _playerController.Sprite.DomainActor as PlayerCharacter;
+        _uiManager.ShowTrade(playerActor, npcActor, npcActor.Inventory, _dataProvider);
     }
 
     private void StartLoot(ActorSprite deadNpcSprite)
@@ -593,6 +684,73 @@ public class PlayingState : IGameState
         }
     }
 
+    public void RecruitFollower(string npcName)
+    {
+        if (_followerControllers.Count >= MaxPartySize) return;
+
+        NpcController found = null;
+        foreach (var npc in _npcControllers)
+        {
+            if (npc.Sprite.Label == npcName)
+            {
+                found = npc;
+                break;
+            }
+        }
+        if (found == null) return;
+
+        _npcControllers.Remove(found);
+        found.Sprite.IsFollower = true;
+        found.Sprite.IsAdversary = false;
+
+        var followerCtrl = new FollowerController(found.Sprite, _chunkManager);
+        _followerControllers.Add(followerCtrl);
+
+        _dataProvider.SetGameFlag($"{npcName.ToLower()}_in_party", "true");
+
+        // Add light source for follower
+        _lights.Add(new LightSource
+        {
+            Type = LightType.Actor,
+            Radius = 200f,
+            Color = new Color(200, 200, 255),
+            Intensity = 0.7f,
+            AttachedActor = found.Sprite
+        });
+    }
+
+    public void DismissFollower(string npcName)
+    {
+        FollowerController found = null;
+        foreach (var f in _followerControllers)
+        {
+            if (f.Sprite.Label == npcName)
+            {
+                found = f;
+                break;
+            }
+        }
+        if (found == null) return;
+
+        _followerControllers.Remove(found);
+        found.Sprite.IsFollower = false;
+
+        var npcCtrl = new NpcController(found.Sprite, _chunkManager);
+        _npcControllers.Add(npcCtrl);
+
+        _dataProvider.ClearGameFlag($"{npcName.ToLower()}_in_party");
+
+        // Remove follower's light source
+        for (int i = _lights.Count - 1; i >= 0; i--)
+        {
+            if (_lights[i].AttachedActor == found.Sprite)
+            {
+                _lights.RemoveAt(i);
+                break;
+            }
+        }
+    }
+
     private void RecalculateVision()
     {
         var px = _playerController.Sprite.TileX;
@@ -631,6 +789,23 @@ public class PlayingState : IGameState
         const int hitW = 48;
         const int hitH = 60;
 
+        // Check followers first (they're in the party, higher interaction priority)
+        foreach (var follower in _followerControllers)
+        {
+            var screenPos = follower.Sprite.VisualPosition;
+            var cx = screenPos.X + RenderConstants.TileWidth / 2f;
+            var bottom = screenPos.Y + RenderConstants.TileHeight / 2f;
+
+            var hitRect = new Rectangle(
+                (int)(cx - hitW / 2),
+                (int)(bottom - hitH),
+                hitW,
+                hitH);
+
+            if (hitRect.Contains((int)worldPos.X, (int)worldPos.Y))
+                return follower.Sprite;
+        }
+
         foreach (var npc in _npcControllers)
         {
             var screenPos = npc.Sprite.VisualPosition;
@@ -660,6 +835,8 @@ public class PlayingState : IGameState
         var allSprites = new List<ActorSprite> { _playerController.Sprite };
         foreach (var npc in _npcControllers)
             allSprites.Add(npc.Sprite);
+        foreach (var f in _followerControllers)
+            allSprites.Add(f.Sprite);
 
         foreach (var sprite in allSprites)
         {
