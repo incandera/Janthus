@@ -6,7 +6,25 @@
       "Bash(dotnet restore:*)",
       "Bash(dotnet build:*)",
       "Bash(dotnet test:*)",
-      "Bash(dotnet tool install:*)"
+      "Bash(dotnet tool install:*)",
+      "WebSearch",
+      "WebFetch(domain:www.gamedev.net)",
+      "WebFetch(domain:pixel-salvaje.itch.io)",
+      "WebFetch(domain:penzilla.itch.io)",
+      "WebFetch(domain:screamingbrainstudios.itch.io)",
+      "WebFetch(domain:www.redblobgames.com)",
+      "WebFetch(domain:pvigier.github.io)",
+      "WebFetch(domain:gvituri.itch.io)",
+      "WebFetch(domain:projectionspace.wordpress.com)",
+      "WebFetch(domain:docs.monogame.net)",
+      "WebFetch(domain:retrostylegames.com)",
+      "WebFetch(domain:opengameart.org)",
+      "WebFetch(domain:gamedev.net)",
+      "WebFetch(domain:craftpix.net)",
+      "WebFetch(domain:clintbellanger.net)",
+      "WebFetch(domain:itch.io)",
+      "WebFetch(domain:kenney-assets.itch.io)",
+      "WebFetch(domain:pvgames.itch.io)"
     ]
   }
 }
