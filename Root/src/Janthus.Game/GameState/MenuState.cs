@@ -27,7 +27,7 @@ public class MenuState : IGameState
 
         _hasContinue = SaveManager.AnySavesExist();
         _menuItems = _hasContinue
-            ? new[] { "Continue", "New Game", "Options", "Quit" }
+            ? new[] { "Continue", "Load Game", "New Game", "Options", "Quit" }
             : new[] { "New Game", "Options", "Quit" };
     }
 
@@ -64,6 +64,10 @@ public class MenuState : IGameState
                     var saveData = SaveManager.LoadMostRecent();
                     if (saveData != null)
                         _game.StartFromSave(saveData);
+                    break;
+                case "Load Game":
+                    var loadState = new LoadGameState(_game, _input, _font, _audioManager);
+                    _game.StateManager.PushState(loadState);
                     break;
                 case "New Game":
                     _game.StartPlaying();

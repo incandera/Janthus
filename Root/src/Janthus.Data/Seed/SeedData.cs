@@ -158,10 +158,12 @@ public static class SeedData
             new Conversation { Id = 3, NpcName = "Merchant", Title = "Merchant - Default Greeting", Priority = 0, EntryNodeId = 10, IsRepeatable = true },
             // Mage conversations
             new Conversation { Id = 4, NpcName = "Mage", Title = "Mage - Wounded Intro", Priority = 10, EntryNodeId = 20, IsRepeatable = false },
-            new Conversation { Id = 5, NpcName = "Mage", Title = "Mage - Health Potion", Priority = 5, EntryNodeId = 25, IsRepeatable = false },
-            new Conversation { Id = 6, NpcName = "Mage", Title = "Mage - Quest Active", Priority = 3, EntryNodeId = 30, IsRepeatable = true },
+            new Conversation { Id = 5, NpcName = "Mage", Title = "Mage - Health Potion", Priority = 2, EntryNodeId = 25, IsRepeatable = true },
+            new Conversation { Id = 6, NpcName = "Mage", Title = "Mage - Quest Active", Priority = 4, EntryNodeId = 30, IsRepeatable = true },
             new Conversation { Id = 7, NpcName = "Mage", Title = "Mage - Quest Complete", Priority = 15, EntryNodeId = 32, IsRepeatable = false },
-            new Conversation { Id = 8, NpcName = "Mage", Title = "Mage - Join Party", Priority = 20, EntryNodeId = 35, IsRepeatable = false }
+            new Conversation { Id = 8, NpcName = "Mage", Title = "Mage - Join Party", Priority = 20, EntryNodeId = 35, IsRepeatable = false },
+            new Conversation { Id = 9, NpcName = "Mage", Title = "Mage - Reconsider Quest", Priority = 3, EntryNodeId = 40, IsRepeatable = true },
+            new Conversation { Id = 10, NpcName = "Mage", Title = "Mage - Quest Active (Wounded)", Priority = 5, EntryNodeId = 44, IsRepeatable = true }
         );
 
         // ========== NODES ==========
@@ -225,7 +227,6 @@ public static class SeedData
                 Text = "The mercenaries still have my Key. Please, be careful when you face them. They are dangerous fighters." },
             new ConversationNode { Id = 31, ConversationId = 6, SpeakerName = "Mage",
                 Text = "I believe in you. Good luck.", IsEndNode = true },
-
             // --- Mage - Quest Complete (Conv 7) ---
             new ConversationNode { Id = 32, ConversationId = 7, SpeakerName = "Mage",
                 Text = "You have it! The Key of Stratholme! I cannot thank you enough. You have saved not only my life's work, but perhaps the entire region." },
@@ -243,6 +244,25 @@ public static class SeedData
                 IsEndNode = true },
             new ConversationNode { Id = 38, ConversationId = 8, SpeakerName = "Mage",
                 Text = "I understand. Should you change your mind, you know where to find me.",
+                IsEndNode = true },
+
+            // --- Mage - Reconsider Quest (Conv 9) ---
+            new ConversationNode { Id = 40, ConversationId = 9, SpeakerName = "Mage",
+                Text = "Please... the mercenaries still have the Key of Stratholme. I know the task is dangerous, but without it, all may be lost. Will you reconsider?" },
+            new ConversationNode { Id = 41, ConversationId = 9, SpeakerName = "Mage",
+                Text = "Thank you! I knew you would come around. The mercenaries were heading north. Please be careful -- they are formidable fighters.",
+                IsEndNode = true },
+            new ConversationNode { Id = 42, ConversationId = 9, SpeakerName = "Mage",
+                Text = "I understand. But please, do not wait too long. I fear what they may do with the Key.",
+                IsEndNode = true },
+
+            // --- Mage - Quest Active Wounded (Conv 10) ---
+            new ConversationNode { Id = 44, ConversationId = 10, SpeakerName = "Mage",
+                Text = "The mercenaries still have my Key. Please, be careful when you face them. And my wounds... they trouble me greatly. If you happen to have a Health Potion, I would be most grateful." },
+            new ConversationNode { Id = 45, ConversationId = 10, SpeakerName = "Mage",
+                Text = "I believe in you. Good luck.", IsEndNode = true },
+            new ConversationNode { Id = 46, ConversationId = 10, SpeakerName = "Mage",
+                Text = "Bless you! I can already feel my strength returning. With this, I may yet be of help to you. Now go -- retrieve the Key!",
                 IsEndNode = true }
         );
 
@@ -309,7 +329,18 @@ public static class SeedData
             new ConversationResponse { Id = 46, NodeId = 35, Text = "You owe me nothing.", NextNodeId = 36, SortOrder = 2 },
             // Node 36 responses
             new ConversationResponse { Id = 47, NodeId = 36, Text = "I would welcome your company.", NextNodeId = 37, SortOrder = 1 },
-            new ConversationResponse { Id = 48, NodeId = 36, Text = "I prefer to travel alone.", NextNodeId = 38, SortOrder = 2 }
+            new ConversationResponse { Id = 48, NodeId = 36, Text = "I prefer to travel alone.", NextNodeId = 38, SortOrder = 2 },
+
+            // --- Mage - Reconsider Quest (Conv 9) ---
+            // Node 40 responses
+            new ConversationResponse { Id = 50, NodeId = 40, Text = "I've changed my mind. I'll retrieve the Key.", NextNodeId = 41, SortOrder = 1 },
+            new ConversationResponse { Id = 51, NodeId = 40, Text = "Not yet. I need more time.", NextNodeId = 42, SortOrder = 2 },
+
+            // --- Mage - Quest Active Wounded (Conv 10) ---
+            // Node 44 responses
+            new ConversationResponse { Id = 53, NodeId = 44, Text = "I'll bring it back soon.", NextNodeId = 45, SortOrder = 1 },
+            new ConversationResponse { Id = 54, NodeId = 44, Text = "Here, take this Health Potion.", NextNodeId = 46, SortOrder = 2 },
+            new ConversationResponse { Id = 55, NodeId = 44, Text = "I don't have one right now.", NextNodeId = 45, SortOrder = 3 }
         );
 
         // ========== CONDITIONS ==========
@@ -335,11 +366,13 @@ public static class SeedData
             new ConversationCondition { Id = 6, ConversationId = 4, ResponseId = 0,
                 ConditionType = ConditionType.FlagNotSet, Value = "talked_to_mage" },
 
-            // Mage - Health Potion (Conv 5): requires talked_to_mage AND mage NOT healed
+            // Mage - Health Potion (Conv 5): requires talked_to_mage AND mage NOT healed AND quest NOT active
             new ConversationCondition { Id = 7, ConversationId = 5, ResponseId = 0,
                 ConditionType = ConditionType.FlagSet, Value = "talked_to_mage" },
             new ConversationCondition { Id = 8, ConversationId = 5, ResponseId = 0,
                 ConditionType = ConditionType.FlagNotSet, Value = "mage_healed" },
+            new ConversationCondition { Id = 19, ConversationId = 5, ResponseId = 0,
+                ConditionType = ConditionType.FlagNotSet, Value = "quest_active_retrieve_key" },
 
             // Mage - Health Potion response 30 (give potion): requires player has Health Potion (min 1 in inventory)
             // We'll use a flag check — the TakeItem action will handle the actual removal
@@ -367,7 +400,27 @@ public static class SeedData
             new ConversationCondition { Id = 14, ConversationId = 8, ResponseId = 0,
                 ConditionType = ConditionType.FlagSet, Value = "mage_healed" },
             new ConversationCondition { Id = 15, ConversationId = 8, ResponseId = 0,
-                ConditionType = ConditionType.FlagNotSet, Value = "mage_in_party" }
+                ConditionType = ConditionType.FlagNotSet, Value = "mage_in_party" },
+
+            // Mage - Quest Active Wounded (Conv 10): requires quest active, key not retrieved, mage not healed
+            new ConversationCondition { Id = 20, ConversationId = 10, ResponseId = 0,
+                ConditionType = ConditionType.FlagSet, Value = "quest_active_retrieve_key" },
+            new ConversationCondition { Id = 21, ConversationId = 10, ResponseId = 0,
+                ConditionType = ConditionType.FlagNotSet, Value = "key_retrieved" },
+            new ConversationCondition { Id = 22, ConversationId = 10, ResponseId = 0,
+                ConditionType = ConditionType.FlagNotSet, Value = "mage_healed" },
+
+            // Mage - Quest Active Wounded response 54 (give Health Potion): requires player has Health Potion
+            new ConversationCondition { Id = 23, ConversationId = 0, ResponseId = 54,
+                ConditionType = ConditionType.HasItem, Value = "Health Potion" },
+
+            // Mage - Reconsider Quest (Conv 9): requires talked_to_mage, quest NOT started, quest NOT done
+            new ConversationCondition { Id = 16, ConversationId = 9, ResponseId = 0,
+                ConditionType = ConditionType.FlagSet, Value = "talked_to_mage" },
+            new ConversationCondition { Id = 17, ConversationId = 9, ResponseId = 0,
+                ConditionType = ConditionType.FlagNotSet, Value = "quest_active_retrieve_key" },
+            new ConversationCondition { Id = 18, ConversationId = 9, ResponseId = 0,
+                ConditionType = ConditionType.FlagNotSet, Value = "quest_done_retrieve_key" }
         );
 
         // ========== ACTIONS ==========
@@ -430,7 +483,17 @@ public static class SeedData
             new ConversationAction { Id = 19, ResponseId = 47,
                 ActionType = ConversationActionType.RecruitFollower, Value = "Mage" },
             new ConversationAction { Id = 20, ResponseId = 47,
-                ActionType = ConversationActionType.SetFlag, Value = "mage_in_party" }
+                ActionType = ConversationActionType.SetFlag, Value = "mage_in_party" },
+
+            // Mage response 50 (reconsider - accept quest): start quest
+            new ConversationAction { Id = 21, ResponseId = 50,
+                ActionType = ConversationActionType.StartQuest, Value = "retrieve_key" },
+
+            // Mage response 54 (give Health Potion during quest): heal mage, take potion
+            new ConversationAction { Id = 22, ResponseId = 54,
+                ActionType = ConversationActionType.SetFlag, Value = "mage_healed" },
+            new ConversationAction { Id = 23, ResponseId = 54,
+                ActionType = ConversationActionType.TakeItem, Value = "Health Potion" }
         );
     }
 

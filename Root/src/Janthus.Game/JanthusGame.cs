@@ -179,6 +179,8 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
 
     public void StartPlaying()
     {
+        _repository.ClearAllGameFlags();
+
         // Create player character with Lawful Good alignment (ensures Guard is friendly)
         var playerAlignment = new Alignment(LawfulnessType.Lawful, DispositionType.Good);
         var player = new PlayerCharacter
@@ -659,12 +661,15 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
 
     public void SetResolution(int index)
     {
-        _resolutionIndex = Math.Clamp(index, 0, Resolutions.Length - 1);
+        var clamped = Math.Clamp(index, 0, Resolutions.Length - 1);
+        if (clamped == _resolutionIndex) return;
+        _resolutionIndex = clamped;
         ApplyResolution();
     }
 
     public void SetFullScreen(bool value)
     {
+        if (value == _graphics.IsFullScreen) return;
         _graphics.IsFullScreen = value;
         _graphics.ApplyChanges();
         CreateRenderTargets();

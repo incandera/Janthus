@@ -424,15 +424,6 @@ public class TradePanel : UIPanel
     {
         if (items == null) return;
 
-        // Scroll indicator (top)
-        if (scrollOffset > 0)
-        {
-            var arrowText = "-- more --";
-            var arrowSize = Font.MeasureString(arrowText);
-            spriteBatch.DrawString(Font, arrowText,
-                new Vector2(x + (width - arrowSize.X) / 2, startY - 14), Color.DarkGray);
-        }
-
         var y = startY;
         var endIndex = Math.Min(items.Count, scrollOffset + maxItems);
         for (int i = scrollOffset; i < endIndex; i++)
@@ -479,14 +470,25 @@ public class TradePanel : UIPanel
             y += ItemLineHeight;
         }
 
-        // Scroll indicator (bottom) — draw inside the column area, replacing last item line
+        // Scroll indicator (top) — right-aligned just left of price column, on first item line
+        if (scrollOffset > 0)
+        {
+            var arrowText = "-- More --";
+            var arrowSize = Font.MeasureString(arrowText);
+            var priceGap = Font.MeasureString("0000g").X;
+            spriteBatch.DrawString(Font, arrowText,
+                new Vector2(x + width - priceGap - arrowSize.X - 4, startY + 2), Color.DarkGray);
+        }
+
+        // Scroll indicator (bottom) — right-aligned just left of price column, on last item line
         if (endIndex < items.Count)
         {
-            var arrowText = "-- more --";
+            var arrowText = "-- More --";
             var arrowSize = Font.MeasureString(arrowText);
+            var priceGap = Font.MeasureString("0000g").X;
             var arrowY = startY + (maxItems - 1) * ItemLineHeight + 2;
             spriteBatch.DrawString(Font, arrowText,
-                new Vector2(x + (width - arrowSize.X) / 2, arrowY), Color.DarkGray);
+                new Vector2(x + width - priceGap - arrowSize.X - 4, arrowY), Color.DarkGray);
         }
 
         if (items.Count == 0)
