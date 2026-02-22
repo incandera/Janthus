@@ -143,7 +143,7 @@ public static class SeedData
     private static void SeedWorldMaps(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<WorldMap>().HasData(
-            new WorldMap { Id = 1, Name = "Default", Seed = 42, ChunkSize = 32, ChunkCountX = 3, ChunkCountY = 3 }
+            new WorldMap { Id = 1, Name = "Default", Seed = 42, ChunkSize = 32, ChunkCountX = 5, ChunkCountY = 5 }
         );
     }
 
