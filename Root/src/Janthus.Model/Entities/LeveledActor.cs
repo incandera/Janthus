@@ -72,6 +72,9 @@ public class LeveledActor : Actor
     public int EffectiveDexterity => Dexterity.Value + GetEquipmentBonus(i => i.DexterityBonus);
     public int EffectiveConstitution => Constitution.Value + GetEquipmentBonus(i => i.ConstitutionBonus);
     public int EffectiveLuck => Luck.Value + GetEquipmentBonus(i => i.LuckBonus);
+    public int EffectiveIntelligence => Intelligence.Value + GetEquipmentBonus(i => i.IntelligenceBonus);
+    public int EffectiveAttunement => Attunement.Value + GetEquipmentBonus(i => i.AttunementBonus);
+    public int EffectiveWillpower => Willpower.Value + GetEquipmentBonus(i => i.WillpowerBonus);
 
     public decimal TotalEquipmentAttackRating
     {

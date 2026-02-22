@@ -1,5 +1,7 @@
 using Microsoft.Xna.Framework;
+using Janthus.Model.Entities;
 using Janthus.Model.Enums;
+using Janthus.Game.Audio;
 using Janthus.Game.World;
 
 namespace Janthus.Game.Actors;
@@ -7,18 +9,22 @@ namespace Janthus.Game.Actors;
 public class FollowerController
 {
     public ActorSprite Sprite { get; }
+    public ActorSprite CombatTarget { get; set; }
     private readonly ChunkManager _chunkManager;
+    private readonly AudioManager _audioManager;
     private float _moveTimer;
     private List<Point> _path;
 
     private const float MoveInterval = 0.18f;
+    private const float CombatMoveInterval = 0.25f;
     private const int FollowThreshold = 2;
     private const int TeleportThreshold = 15;
 
-    public FollowerController(ActorSprite sprite, ChunkManager chunkManager)
+    public FollowerController(ActorSprite sprite, ChunkManager chunkManager, AudioManager audioManager)
     {
         Sprite = sprite;
         _chunkManager = chunkManager;
+        _audioManager = audioManager;
     }
 
     public void Update(GameTime gameTime, ActorSprite leader, List<ActorSprite> allActors, bool isInCombat)
@@ -28,9 +34,62 @@ public class FollowerController
         // Always update visual interpolation
         Sprite.UpdateVisual(deltaTime, 1.0f);
 
-        // Skip movement when dead or in combat
+        // Skip movement when dead
         if (Sprite.DomainActor.Status == ActorStatus.Dead) return;
-        if (isInCombat) return;
+
+        // Combat movement: move toward target if out of range
+        if (isInCombat && CombatTarget != null && CombatTarget.DomainActor.Status == ActorStatus.Alive)
+        {
+            if (!Sprite.HasReachedTarget) return;
+
+            var maxRange = GetMaxOperationRange();
+            var cdx = Sprite.TileX - CombatTarget.TileX;
+            var cdy = Sprite.TileY - CombatTarget.TileY;
+            var combatDist = (float)Math.Sqrt(cdx * cdx + cdy * cdy);
+
+            // Already in range — stop and let CombatManager handle attacks
+            if (combatDist <= maxRange)
+            {
+                _path = null;
+                return;
+            }
+
+            // Path toward target
+            _moveTimer -= deltaTime;
+            if (_moveTimer > 0) return;
+
+            if (_path == null || _path.Count == 0)
+            {
+                var start = new Point(Sprite.TileX, Sprite.TileY);
+                var target = new Point(CombatTarget.TileX, CombatTarget.TileY);
+                _path = Pathfinder.FindPathAdjacentTo(_chunkManager, start, target, allActors);
+            }
+
+            if (_path is { Count: > 0 })
+            {
+                var next = _path[0];
+                _path.RemoveAt(0);
+
+                if (_chunkManager.IsWalkable(next.X, next.Y))
+                {
+                    Sprite.SetTilePosition(next.X, next.Y, _chunkManager);
+                    _moveTimer = CombatMoveInterval;
+                    PlayFootstepAtLeaderDistance(next.X, next.Y, leader);
+                }
+                else
+                {
+                    _path = null;
+                }
+
+                if (_path != null && _path.Count == 0)
+                    _path = null;
+            }
+            return;
+        }
+
+        // Not in combat — clear target and follow leader
+        if (!isInCombat)
+            CombatTarget = null;
 
         // Wait for visual to catch up
         if (!Sprite.HasReachedTarget) return;
@@ -74,6 +133,7 @@ public class FollowerController
             {
                 Sprite.SetTilePosition(next.X, next.Y, _chunkManager);
                 _moveTimer = MoveInterval;
+                PlayFootstepAtLeaderDistance(next.X, next.Y, leader);
             }
             else
             {
@@ -83,6 +143,39 @@ public class FollowerController
             if (_path != null && _path.Count == 0)
                 _path = null;
         }
+    }
+
+    private float GetMaxOperationRange()
+    {
+        var skills = GetFollowerSkills();
+        var actor = Sprite.DomainActor as LeveledActor;
+        float maxRange = 1.0f; // default melee range
+        if (actor == null) return maxRange;
+
+        foreach (var skill in skills)
+        {
+            foreach (var op in skill.ConferredOperationList)
+            {
+                if (op.ManaCost <= actor.CurrentMana && op.BasePower > 0 && op.Range > maxRange)
+                    maxRange = op.Range;
+            }
+        }
+        return maxRange;
+    }
+
+    private List<Skill> GetFollowerSkills()
+    {
+        if (Sprite.DomainActor is NonPlayerCharacter npc)
+            return npc.Skills;
+        return new List<Skill>();
+    }
+
+    private void PlayFootstepAtLeaderDistance(int tileX, int tileY, ActorSprite leader)
+    {
+        var dist = (float)Math.Sqrt(
+            Math.Pow(tileX - leader.TileX, 2) + Math.Pow(tileY - leader.TileY, 2));
+        var stepTile = _chunkManager.GetTile(tileX, tileY);
+        _audioManager.PlayFootstepAtDistance(stepTile?.Name ?? "Dirt", dist);
     }
 
     public void ClearPath()

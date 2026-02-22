@@ -21,6 +21,8 @@ public static class SeedData
         SeedItems(modelBuilder);
         SeedMerchantStock(modelBuilder);
         SeedInspectDescriptions(modelBuilder);
+        SeedQuests(modelBuilder);
+        SeedOperations(modelBuilder);
     }
 
     private static void SeedCharacterClasses(ModelBuilder modelBuilder)
@@ -233,9 +235,9 @@ public static class SeedData
 
             // --- Mage - Join Party (Conv 8) ---
             new ConversationNode { Id = 35, ConversationId = 8, SpeakerName = "Mage",
-                Text = "I have been reflecting on what you did for me. Retrieving the Key, tending to my wounds... I owe you a great debt." },
+                Text = "You saved my life with that healing potion. I will not forget such kindness." },
             new ConversationNode { Id = 36, ConversationId = 8, SpeakerName = "Mage",
-                Text = "The road ahead will only grow more dangerous. I may not be a warrior, but my arcane knowledge could prove useful. Would you allow me to travel with you?" },
+                Text = "The road ahead is perilous, and I sense dark forces at work. My arcane arts could aid you in what lies ahead. Would you allow me to travel with you?" },
             new ConversationNode { Id = 37, ConversationId = 8, SpeakerName = "Mage",
                 Text = "Then it is settled! Together we shall face whatever lies ahead. Lead on, friend.",
                 IsEndNode = true },
@@ -361,9 +363,9 @@ public static class SeedData
             new ConversationCondition { Id = 12, ConversationId = 7, ResponseId = 0,
                 ConditionType = ConditionType.FlagNotSet, Value = "quest_done_retrieve_key" },
 
-            // Mage - Join Party (Conv 8): requires quest complete AND not already in party
+            // Mage - Join Party (Conv 8): requires mage healed AND not already in party
             new ConversationCondition { Id = 14, ConversationId = 8, ResponseId = 0,
-                ConditionType = ConditionType.FlagSet, Value = "quest_done_retrieve_key" },
+                ConditionType = ConditionType.FlagSet, Value = "mage_healed" },
             new ConversationCondition { Id = 15, ConversationId = 8, ResponseId = 0,
                 ConditionType = ConditionType.FlagNotSet, Value = "mage_in_party" }
         );
@@ -448,30 +450,30 @@ public static class SeedData
     {
         modelBuilder.Entity<Item>().HasData(
             // Existing items (updated with equipment properties)
-            new { Id = 1, Name = "Health Potion", Description = "Restores a moderate amount of health.", TradeValue = 25m, Durability = 1m, ItemTypeId = 3, Slot = EquipmentSlot.None, AttackRating = 0m, ArmorRating = 0m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0 },
-            new { Id = 2, Name = "Mana Potion", Description = "Restores a moderate amount of mana.", TradeValue = 30m, Durability = 1m, ItemTypeId = 3, Slot = EquipmentSlot.None, AttackRating = 0m, ArmorRating = 0m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0 },
-            new { Id = 3, Name = "Short Sword", Description = "A simple but reliable blade.", TradeValue = 60m, Durability = 100m, ItemTypeId = 1, Slot = EquipmentSlot.Weapon, AttackRating = 8m, ArmorRating = 0m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0 },
-            new { Id = 4, Name = "Leather Armor", Description = "Light armor offering basic protection.", TradeValue = 80m, Durability = 100m, ItemTypeId = 2, Slot = EquipmentSlot.Cuirass, AttackRating = 0m, ArmorRating = 6m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 1, ConstitutionBonus = 0 },
-            new { Id = 5, Name = "Enchanted Amulet", Description = "A glowing amulet pulsing with arcane energy.", TradeValue = 200m, Durability = 999m, ItemTypeId = 4, Slot = EquipmentSlot.Accessory, AttackRating = 0m, ArmorRating = 0m, LuckBonus = 3, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0 },
-            new { Id = 6, Name = "Iron Ore", Description = "Raw iron ore for smelting.", TradeValue = 12m, Durability = 999m, ItemTypeId = 5, Slot = EquipmentSlot.None, AttackRating = 0m, ArmorRating = 0m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0 },
-            new { Id = 7, Name = "Antidote", Description = "Cures common poisons.", TradeValue = 20m, Durability = 1m, ItemTypeId = 3, Slot = EquipmentSlot.None, AttackRating = 0m, ArmorRating = 0m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0 },
-            new { Id = 8, Name = "Wooden Shield", Description = "A sturdy wooden shield.", TradeValue = 45m, Durability = 80m, ItemTypeId = 2, Slot = EquipmentSlot.Accessory, AttackRating = 0m, ArmorRating = 3m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0 },
+            new { Id = 1, Name = "Health Potion", Description = "Restores a moderate amount of health.", TradeValue = 25m, Durability = 1m, ItemTypeId = 3, Slot = EquipmentSlot.None, AttackRating = 0m, ArmorRating = 0m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 2, Name = "Mana Potion", Description = "Restores a moderate amount of mana.", TradeValue = 30m, Durability = 1m, ItemTypeId = 3, Slot = EquipmentSlot.None, AttackRating = 0m, ArmorRating = 0m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 3, Name = "Short Sword", Description = "A simple but reliable blade.", TradeValue = 60m, Durability = 100m, ItemTypeId = 1, Slot = EquipmentSlot.Weapon, AttackRating = 8m, ArmorRating = 0m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 4, Name = "Leather Armor", Description = "Light armor offering basic protection.", TradeValue = 80m, Durability = 100m, ItemTypeId = 2, Slot = EquipmentSlot.Cuirass, AttackRating = 0m, ArmorRating = 6m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 1, ConstitutionBonus = 0, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 5, Name = "Enchanted Amulet", Description = "A glowing amulet pulsing with arcane energy.", TradeValue = 200m, Durability = 999m, ItemTypeId = 4, Slot = EquipmentSlot.Accessory, AttackRating = 0m, ArmorRating = 0m, LuckBonus = 3, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0, AttunementBonus = 2, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 6, Name = "Iron Ore", Description = "Raw iron ore for smelting.", TradeValue = 12m, Durability = 999m, ItemTypeId = 5, Slot = EquipmentSlot.None, AttackRating = 0m, ArmorRating = 0m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 7, Name = "Antidote", Description = "Cures common poisons.", TradeValue = 20m, Durability = 1m, ItemTypeId = 3, Slot = EquipmentSlot.None, AttackRating = 0m, ArmorRating = 0m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 8, Name = "Wooden Shield", Description = "A sturdy wooden shield.", TradeValue = 45m, Durability = 80m, ItemTypeId = 2, Slot = EquipmentSlot.Accessory, AttackRating = 0m, ArmorRating = 3m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
             // New equipment items
-            new { Id = 9, Name = "Dagger", Description = "A small, quick blade favored by rogues.", TradeValue = 30m, Durability = 80m, ItemTypeId = 1, Slot = EquipmentSlot.Weapon, AttackRating = 5m, ArmorRating = 0m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 1, ConstitutionBonus = 0 },
-            new { Id = 10, Name = "Greatsword", Description = "A massive two-handed blade of tremendous power.", TradeValue = 150m, Durability = 120m, ItemTypeId = 1, Slot = EquipmentSlot.Weapon, AttackRating = 15m, ArmorRating = 0m, LuckBonus = 0, StrengthBonus = 2, DexterityBonus = 0, ConstitutionBonus = 0 },
-            new { Id = 11, Name = "Mace", Description = "A heavy blunt weapon effective against armor.", TradeValue = 75m, Durability = 110m, ItemTypeId = 1, Slot = EquipmentSlot.Weapon, AttackRating = 10m, ArmorRating = 0m, LuckBonus = 0, StrengthBonus = 1, DexterityBonus = 0, ConstitutionBonus = 0 },
-            new { Id = 12, Name = "Leather Helmet", Description = "A simple leather cap for head protection.", TradeValue = 35m, Durability = 80m, ItemTypeId = 2, Slot = EquipmentSlot.Helmet, AttackRating = 0m, ArmorRating = 2m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0 },
-            new { Id = 13, Name = "Leather Gauntlets", Description = "Supple leather gloves that maintain dexterity.", TradeValue = 25m, Durability = 70m, ItemTypeId = 2, Slot = EquipmentSlot.Gauntlets, AttackRating = 0m, ArmorRating = 1m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 1, ConstitutionBonus = 0 },
-            new { Id = 14, Name = "Leather Greaves", Description = "Leather leg guards for basic protection.", TradeValue = 30m, Durability = 80m, ItemTypeId = 2, Slot = EquipmentSlot.Greaves, AttackRating = 0m, ArmorRating = 2m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0 },
-            new { Id = 15, Name = "Leather Boots", Description = "Comfortable leather boots for long journeys.", TradeValue = 25m, Durability = 70m, ItemTypeId = 2, Slot = EquipmentSlot.Boots, AttackRating = 0m, ArmorRating = 1m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 1, ConstitutionBonus = 0 },
-            new { Id = 16, Name = "Iron Helmet", Description = "A sturdy iron helm providing solid protection.", TradeValue = 70m, Durability = 120m, ItemTypeId = 2, Slot = EquipmentSlot.Helmet, AttackRating = 0m, ArmorRating = 4m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 1 },
-            new { Id = 17, Name = "Iron Cuirass", Description = "Heavy iron chest armor for maximum protection.", TradeValue = 160m, Durability = 150m, ItemTypeId = 2, Slot = EquipmentSlot.Cuirass, AttackRating = 0m, ArmorRating = 10m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 2 },
-            new { Id = 18, Name = "Iron Gauntlets", Description = "Heavy iron gauntlets that add striking power.", TradeValue = 55m, Durability = 110m, ItemTypeId = 2, Slot = EquipmentSlot.Gauntlets, AttackRating = 0m, ArmorRating = 3m, LuckBonus = 0, StrengthBonus = 1, DexterityBonus = 0, ConstitutionBonus = 0 },
-            new { Id = 19, Name = "Iron Greaves", Description = "Solid iron leg guards for heavy duty.", TradeValue = 65m, Durability = 120m, ItemTypeId = 2, Slot = EquipmentSlot.Greaves, AttackRating = 0m, ArmorRating = 4m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 1 },
-            new { Id = 20, Name = "Iron Boots", Description = "Heavy iron boots offering solid foot protection.", TradeValue = 55m, Durability = 110m, ItemTypeId = 2, Slot = EquipmentSlot.Boots, AttackRating = 0m, ArmorRating = 3m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0 },
+            new { Id = 9, Name = "Dagger", Description = "A small, quick blade favored by rogues.", TradeValue = 30m, Durability = 80m, ItemTypeId = 1, Slot = EquipmentSlot.Weapon, AttackRating = 5m, ArmorRating = 0m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 1, ConstitutionBonus = 0, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 10, Name = "Greatsword", Description = "A massive two-handed blade of tremendous power.", TradeValue = 150m, Durability = 120m, ItemTypeId = 1, Slot = EquipmentSlot.Weapon, AttackRating = 15m, ArmorRating = 0m, LuckBonus = 0, StrengthBonus = 2, DexterityBonus = 0, ConstitutionBonus = 0, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 11, Name = "Mace", Description = "A heavy blunt weapon effective against armor.", TradeValue = 75m, Durability = 110m, ItemTypeId = 1, Slot = EquipmentSlot.Weapon, AttackRating = 10m, ArmorRating = 0m, LuckBonus = 0, StrengthBonus = 1, DexterityBonus = 0, ConstitutionBonus = 0, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 12, Name = "Leather Helmet", Description = "A simple leather cap for head protection.", TradeValue = 35m, Durability = 80m, ItemTypeId = 2, Slot = EquipmentSlot.Helmet, AttackRating = 0m, ArmorRating = 2m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 13, Name = "Leather Gauntlets", Description = "Supple leather gloves that maintain dexterity.", TradeValue = 25m, Durability = 70m, ItemTypeId = 2, Slot = EquipmentSlot.Gauntlets, AttackRating = 0m, ArmorRating = 1m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 1, ConstitutionBonus = 0, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 14, Name = "Leather Greaves", Description = "Leather leg guards for basic protection.", TradeValue = 30m, Durability = 80m, ItemTypeId = 2, Slot = EquipmentSlot.Greaves, AttackRating = 0m, ArmorRating = 2m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 15, Name = "Leather Boots", Description = "Comfortable leather boots for long journeys.", TradeValue = 25m, Durability = 70m, ItemTypeId = 2, Slot = EquipmentSlot.Boots, AttackRating = 0m, ArmorRating = 1m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 1, ConstitutionBonus = 0, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 16, Name = "Iron Helmet", Description = "A sturdy iron helm providing solid protection.", TradeValue = 70m, Durability = 120m, ItemTypeId = 2, Slot = EquipmentSlot.Helmet, AttackRating = 0m, ArmorRating = 4m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 1, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 17, Name = "Iron Cuirass", Description = "Heavy iron chest armor for maximum protection.", TradeValue = 160m, Durability = 150m, ItemTypeId = 2, Slot = EquipmentSlot.Cuirass, AttackRating = 0m, ArmorRating = 10m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 2, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 18, Name = "Iron Gauntlets", Description = "Heavy iron gauntlets that add striking power.", TradeValue = 55m, Durability = 110m, ItemTypeId = 2, Slot = EquipmentSlot.Gauntlets, AttackRating = 0m, ArmorRating = 3m, LuckBonus = 0, StrengthBonus = 1, DexterityBonus = 0, ConstitutionBonus = 0, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 19, Name = "Iron Greaves", Description = "Solid iron leg guards for heavy duty.", TradeValue = 65m, Durability = 120m, ItemTypeId = 2, Slot = EquipmentSlot.Greaves, AttackRating = 0m, ArmorRating = 4m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 1, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 20, Name = "Iron Boots", Description = "Heavy iron boots offering solid foot protection.", TradeValue = 55m, Durability = 110m, ItemTypeId = 2, Slot = EquipmentSlot.Boots, AttackRating = 0m, ArmorRating = 3m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
             // Scenario items
-            new { Id = 21, Name = "Dunedain Amulet", Description = "An ancient amulet of the Dunedain, radiating powerful fortune.", TradeValue = 350m, Durability = 999m, ItemTypeId = 4, Slot = EquipmentSlot.Accessory, AttackRating = 0m, ArmorRating = 0m, LuckBonus = 5, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0 },
-            new { Id = 22, Name = "Key of Stratholme", Description = "An ornate key belonging to the Mage of Stratholme.", TradeValue = 0m, Durability = 999m, ItemTypeId = 6, Slot = EquipmentSlot.None, AttackRating = 0m, ArmorRating = 0m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0 }
+            new { Id = 21, Name = "Dunedain Amulet", Description = "An ancient amulet of the Dunedain, radiating powerful fortune.", TradeValue = 350m, Durability = 999m, ItemTypeId = 4, Slot = EquipmentSlot.Accessory, AttackRating = 0m, ArmorRating = 0m, LuckBonus = 5, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 },
+            new { Id = 22, Name = "Key of Stratholme", Description = "An ornate key belonging to the Mage of Stratholme.", TradeValue = 0m, Durability = 999m, ItemTypeId = 6, Slot = EquipmentSlot.None, AttackRating = 0m, ArmorRating = 0m, LuckBonus = 0, StrengthBonus = 0, DexterityBonus = 0, ConstitutionBonus = 0, AttunementBonus = 0, IntelligenceBonus = 0, WillpowerBonus = 0 }
         );
     }
 
@@ -601,6 +603,40 @@ public static class SeedData
             // Mage - party member (Id 50): requires mage_in_party
             new InspectCondition { Id = 8, InspectDescriptionId = 50,
                 ConditionType = ConditionType.FlagSet, Value = "mage_in_party" }
+        );
+    }
+
+    private static void SeedQuests(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<QuestDefinition>().HasData(
+            new QuestDefinition
+            {
+                Id = 1,
+                Name = "Retrieve the Key of Stratholme",
+                Description = "The Mage was ambushed by mercenaries who stole the Key of Stratholme, an ancient artifact that opens a vault to the north. He is too wounded to pursue them himself and has asked you to retrieve it.",
+                ActivationFlag = "quest_active_retrieve_key",
+                CompletionFlag = "quest_done_retrieve_key",
+                FailureFlag = "",
+                SortOrder = 1
+            }
+        );
+
+        modelBuilder.Entity<QuestGoal>().HasData(
+            new QuestGoal { Id = 1, QuestDefinitionId = 1, Description = "Speak with the wounded Mage", CompletionFlag = "talked_to_mage", IsOptional = false, SortOrder = 1 },
+            new QuestGoal { Id = 2, QuestDefinitionId = 1, Description = "Heal the Mage with a Health Potion", CompletionFlag = "mage_healed", IsOptional = true, SortOrder = 2 },
+            new QuestGoal { Id = 3, QuestDefinitionId = 1, Description = "Defeat the mercenaries", CompletionFlag = "key_retrieved", IsOptional = false, SortOrder = 3 },
+            new QuestGoal { Id = 4, QuestDefinitionId = 1, Description = "Retrieve the Key of Stratholme", CompletionFlag = "key_retrieved", IsOptional = false, SortOrder = 4 },
+            new QuestGoal { Id = 5, QuestDefinitionId = 1, Description = "Return the Key to the Mage", CompletionFlag = "quest_done_retrieve_key", IsOptional = false, SortOrder = 5 },
+            new QuestGoal { Id = 6, QuestDefinitionId = 1, Description = "Recruit the Mage to your party", CompletionFlag = "mage_in_party", IsOptional = true, SortOrder = 6 }
+        );
+    }
+
+    private static void SeedOperations(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Operation>().HasData(
+            new { Id = 1, Name = "Magic Missile", Description = "A bolt of arcane energy.", BasePower = 8m, ManaCost = 5m, CooldownSeconds = 1.5, Range = 6.0f, EffectType = EffectType.Magical },
+            new { Id = 2, Name = "Fireball", Description = "A devastating ball of fire.", BasePower = 18m, ManaCost = 15m, CooldownSeconds = 3.0, Range = 5.0f, EffectType = EffectType.Magical },
+            new { Id = 3, Name = "Arcane Shield", Description = "A protective barrier of arcane force.", BasePower = 0m, ManaCost = 10m, CooldownSeconds = 10.0, Range = 0.0f, EffectType = EffectType.Magical }
         );
     }
 }

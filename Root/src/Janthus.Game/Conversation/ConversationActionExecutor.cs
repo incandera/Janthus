@@ -1,6 +1,7 @@
 using Janthus.Model.Entities;
 using Janthus.Model.Enums;
 using Janthus.Model.Services;
+using Janthus.Game.Audio;
 
 namespace Janthus.Game.Conversation;
 
@@ -8,13 +9,18 @@ public class ConversationActionExecutor
 {
     private readonly IGameDataProvider _dataProvider;
     private readonly PlayerCharacter _player;
+    private readonly AudioManager _audioManager;
 
     public Action<string> OnRecruitFollower { get; set; }
+    public Action<string> OnQuestStarted { get; set; }
+    public Action<string> OnQuestCompleted { get; set; }
 
-    public ConversationActionExecutor(IGameDataProvider dataProvider, PlayerCharacter player)
+    public ConversationActionExecutor(IGameDataProvider dataProvider, PlayerCharacter player,
+                                      AudioManager audioManager)
     {
         _dataProvider = dataProvider;
         _player = player;
+        _audioManager = audioManager;
     }
 
     public void ExecuteActions(List<ConversationAction> actions)
@@ -39,12 +45,18 @@ public class ConversationActionExecutor
 
             case ConversationActionType.GiveGold:
                 if (decimal.TryParse(action.Value, out var giveAmount))
+                {
                     _player.Gold += giveAmount;
+                    _audioManager.PlaySound(SoundId.GoldReceive);
+                }
                 break;
 
             case ConversationActionType.TakeGold:
                 if (decimal.TryParse(action.Value, out var takeAmount))
+                {
                     _player.Gold = Math.Max(0, _player.Gold - takeAmount);
+                    _audioManager.PlaySound(SoundId.GoldReceive);
+                }
                 break;
 
             case ConversationActionType.GiveItem:
@@ -56,6 +68,7 @@ public class ConversationActionExecutor
                         existing.Quantity++;
                     else
                         _player.Inventory.Add(new InventoryItem(giveItem));
+                    _audioManager.PlaySound(SoundId.ItemPickup);
                 }
                 break;
 
@@ -66,6 +79,7 @@ public class ConversationActionExecutor
                     takeItem.Quantity--;
                     if (takeItem.Quantity <= 0)
                         _player.Inventory.Remove(takeItem);
+                    _audioManager.PlaySound(SoundId.ItemPickup);
                 }
                 break;
 
@@ -81,11 +95,13 @@ public class ConversationActionExecutor
 
             case ConversationActionType.StartQuest:
                 _dataProvider.SetGameFlag($"quest_active_{action.Value}", "true");
+                OnQuestStarted?.Invoke(action.Value);
                 break;
 
             case ConversationActionType.CompleteQuest:
                 _dataProvider.ClearGameFlag($"quest_active_{action.Value}");
                 _dataProvider.SetGameFlag($"quest_done_{action.Value}", "true");
+                OnQuestCompleted?.Invoke(action.Value);
                 break;
 
             case ConversationActionType.GiveExperience:

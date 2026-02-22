@@ -17,6 +17,9 @@ public class Item : JanthusObject
     public int StrengthBonus { get; set; }
     public int DexterityBonus { get; set; }
     public int ConstitutionBonus { get; set; }
+    public int AttunementBonus { get; set; }
+    public int IntelligenceBonus { get; set; }
+    public int WillpowerBonus { get; set; }
 
     public List<Effect> EffectList { get; set; } = new();
     public List<Item> CraftComponents { get; set; } = new();

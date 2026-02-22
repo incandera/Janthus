@@ -51,6 +51,14 @@ public interface IGameDataProvider
     // Inspect descriptions
     List<InspectDescription> GetInspectDescriptions(string targetType, string targetKey);
 
+    // Quests
+    List<QuestDefinition> GetQuestDefinitions();
+    QuestDefinition GetQuestDefinition(int id);
+
+    // Operations (spells)
+    List<Operation> GetOperations();
+    Operation GetOperation(int id);
+
     // Game flags
     List<GameFlag> GetGameFlags();
     GameFlag GetGameFlag(string name);

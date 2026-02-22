@@ -9,6 +9,7 @@ using Janthus.Game.World;
 using Janthus.Game.Actors;
 using Janthus.Game.Combat;
 using Janthus.Game.Conversation;
+using Janthus.Game.Audio;
 using Janthus.Game.Rendering;
 using Janthus.Game.Saving;
 using Janthus.Game.UI;
@@ -28,6 +29,7 @@ public class PlayingState : IGameState
     private readonly ConversationRunner _conversationRunner;
     private readonly IGameDataProvider _dataProvider;
     private readonly CombatManager _combatManager;
+    private readonly AudioManager _audioManager;
     private readonly List<FollowerController> _followerControllers;
     private bool _paused;
     private bool _gameOver;
@@ -59,7 +61,8 @@ public class PlayingState : IGameState
                         PlayerController playerController, List<NpcController> npcControllers,
                         List<FollowerController> followerControllers,
                         UIManager uiManager, ConversationRunner conversationRunner,
-                        IGameDataProvider dataProvider, CombatManager combatManager)
+                        IGameDataProvider dataProvider, CombatManager combatManager,
+                        AudioManager audioManager)
     {
         _game = game;
         _input = input;
@@ -73,6 +76,7 @@ public class PlayingState : IGameState
         _conversationRunner = conversationRunner;
         _dataProvider = dataProvider;
         _combatManager = combatManager;
+        _audioManager = audioManager;
 
         // Initialize day/night cycle and lightmap renderer
         _dayNightCycle = new DayNightCycle();
@@ -106,7 +110,29 @@ public class PlayingState : IGameState
         };
 
         // Wire recruit follower callback
-        _conversationRunner.OnRecruitFollower = name => RecruitFollower(name);
+        _conversationRunner.OnRecruitFollower = name =>
+        {
+            RecruitFollower(name);
+            _audioManager.PlaySound(SoundId.FollowerJoined);
+        };
+
+        // Wire quest event callbacks
+        _conversationRunner.OnQuestStarted = questKey =>
+        {
+            var questName = ResolveQuestName(questKey);
+            _combatManager.AddEventLog($"Quest Started: {questName}", Color.Gold);
+            _audioManager.PlaySound(SoundId.QuestAccepted);
+        };
+        _conversationRunner.OnQuestCompleted = questKey =>
+        {
+            var questName = ResolveQuestName(questKey);
+            _combatManager.AddEventLog($"Quest Completed: {questName}", new Color(100, 200, 100));
+            _audioManager.PlaySound(SoundId.QuestCompleted);
+        };
+
+        // Wire combat music transitions
+        _combatManager.OnCombatStarted = () => _audioManager.PlayMusic(MusicId.Combat);
+        _combatManager.OnAllCombatEnded = () => _audioManager.PlayMusic(MusicId.Exploration);
 
         // Add light sources for existing followers
         foreach (var follower in _followerControllers)
@@ -122,7 +148,10 @@ public class PlayingState : IGameState
         }
     }
 
-    public void Enter() { }
+    public void Enter()
+    {
+        _audioManager.PlayMusic(MusicId.Exploration);
+    }
     public void Exit() { }
 
     public void TogglePause()
@@ -137,7 +166,8 @@ public class PlayingState : IGameState
         {
             if (_input.IsKeyPressed(Keys.Escape))
             {
-                var menuState = new MenuState(_game, _input, _font);
+                _audioManager.StopMusic();
+                var menuState = new MenuState(_game, _input, _font, _audioManager);
                 _game.StateManager.ChangeState(menuState);
             }
             return;
@@ -159,6 +189,8 @@ public class PlayingState : IGameState
         {
             if (_uiManager.IsSaveLoadVisible)
                 _uiManager.HideSaveLoadPanel();
+            else if (_uiManager.IsQuestJournalVisible)
+                _uiManager.HideQuestJournal();
             else if (_uiManager.IsTradeVisible)
                 _uiManager.HideTrade();
             else if (_uiManager.IsDialogVisible)
@@ -179,6 +211,14 @@ public class PlayingState : IGameState
         if (_input.IsKeyPressed(Keys.I) && !_uiManager.IsTradeVisible && !_uiManager.IsDialogVisible)
         {
             _uiManager.ToggleInventory();
+        }
+
+        if (_input.IsKeyPressed(Keys.J))
+        {
+            if (_uiManager.IsQuestJournalVisible)
+                _uiManager.HideQuestJournal();
+            else if (!_uiManager.IsAnyMenuVisible)
+                _uiManager.ToggleQuestJournal();
         }
 
         // Debug: T advances time of day by 1 hour
@@ -215,6 +255,12 @@ public class PlayingState : IGameState
             _uiManager.ShowLoadPanel();
         }
 
+        if (_uiManager.MainMenuRequested)
+        {
+            _game.ReturnToMainMenu();
+            return;
+        }
+
         if (_uiManager.QuitRequested)
         {
             _game.Exit();
@@ -242,7 +288,8 @@ public class PlayingState : IGameState
             {
                 foreach (var npc in _npcControllers)
                 {
-                    npc.Update(gameTime, _combatManager.IsInCombat(npc.Sprite));
+                    npc.Update(gameTime, _combatManager.IsInCombat(npc.Sprite),
+                        _playerController.Sprite.TileX, _playerController.Sprite.TileY);
                 }
 
                 // Build combined actor list for follower pathfinding
@@ -490,24 +537,18 @@ public class PlayingState : IGameState
 
         if (npcActor == null) return;
 
-        // For followers without merchant stock, trade directly from their inventory
+        // Followers always use loot mode (free bidirectional transfer)
+        if (isFollower)
+        {
+            var player = _playerController.Sprite.DomainActor as PlayerCharacter;
+            _uiManager.ShowLoot(player, npcActor, npcActor.Inventory);
+            return;
+        }
+
+        // For regular NPCs without merchant stock, show "nothing to trade"
         var stockEntries = _dataProvider.GetMerchantStock(npcName);
         if (stockEntries.Count == 0)
         {
-            if (isFollower)
-            {
-                // Followers trade their personal inventory directly
-                if (npcActor.Inventory.Count == 0)
-                {
-                    _uiManager.ShowDialog(npcName, $"{npcName} has nothing to trade.",
-                        new List<string>(), null, isEndNode: true, onDismiss: () => { });
-                    return;
-                }
-
-                var player = _playerController.Sprite.DomainActor as PlayerCharacter;
-                _uiManager.ShowTrade(player, npcActor, npcActor.Inventory, _dataProvider);
-                return;
-            }
 
             _uiManager.ShowDialog(npcName, $"{npcName} has nothing to trade.",
                 new List<string>(), null, isEndNode: true, onDismiss: () => { });
@@ -684,6 +725,19 @@ public class PlayingState : IGameState
         }
     }
 
+    private string ResolveQuestName(string questKey)
+    {
+        var flagName = $"quest_active_{questKey}";
+        var quests = _dataProvider.GetQuestDefinitions();
+        foreach (var quest in quests)
+        {
+            if (quest.ActivationFlag == flagName)
+                return quest.Name;
+        }
+        // Fallback: humanize the key
+        return questKey.Replace('_', ' ');
+    }
+
     public void RecruitFollower(string npcName)
     {
         if (_followerControllers.Count >= MaxPartySize) return;
@@ -703,7 +757,7 @@ public class PlayingState : IGameState
         found.Sprite.IsFollower = true;
         found.Sprite.IsAdversary = false;
 
-        var followerCtrl = new FollowerController(found.Sprite, _chunkManager);
+        var followerCtrl = new FollowerController(found.Sprite, _chunkManager, _audioManager);
         _followerControllers.Add(followerCtrl);
 
         _dataProvider.SetGameFlag($"{npcName.ToLower()}_in_party", "true");
@@ -735,7 +789,7 @@ public class PlayingState : IGameState
         _followerControllers.Remove(found);
         found.Sprite.IsFollower = false;
 
-        var npcCtrl = new NpcController(found.Sprite, _chunkManager);
+        var npcCtrl = new NpcController(found.Sprite, _chunkManager, _audioManager);
         _npcControllers.Add(npcCtrl);
 
         _dataProvider.ClearGameFlag($"{npcName.ToLower()}_in_party");

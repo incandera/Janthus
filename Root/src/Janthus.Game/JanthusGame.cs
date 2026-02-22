@@ -13,6 +13,7 @@ using Janthus.Game.Actors;
 using Janthus.Game.Combat;
 using Janthus.Game.Conversation;
 using Janthus.Game.Rendering;
+using Janthus.Game.Audio;
 using Janthus.Game.Saving;
 using Janthus.Game.UI;
 
@@ -32,6 +33,7 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
     private GameDataRepository _repository;
     private PlayingState _playingState;
     private AssetManager _assetManager;
+    private AudioManager _audioManager;
 
     private RenderTarget2D _sceneTarget;
     private RenderTarget2D _lightmapTarget;
@@ -58,6 +60,7 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
     private int _resolutionIndex = 1; // Default 1280x720
 
     public Texture2D PixelTexture => _pixelTexture;
+    public AudioManager AudioManager => _audioManager;
     public GameStateManager StateManager => _stateManager;
     public int ResolutionIndex => _resolutionIndex;
     public bool IsFullScreen => _graphics.IsFullScreen;
@@ -65,6 +68,13 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
     public string CurrentResolutionLabel =>
         $"{Resolutions[_resolutionIndex].Width}x{Resolutions[_resolutionIndex].Height}" +
         (_graphics.IsFullScreen ? " (Fullscreen)" : " (Windowed)");
+
+    public void ReturnToMainMenu()
+    {
+        _audioManager.StopMusic();
+        var menuState = new MenuState(this, _input, _font, _audioManager);
+        _stateManager.ChangeState(menuState);
+    }
 
     public JanthusGame()
     {
@@ -109,10 +119,19 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
 
         // Load sprite assets (graceful fallback if missing)
         _assetManager = new AssetManager();
-        _assetManager.LoadAll(GraphicsDevice, Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Content"));
+        var contentRoot = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Content");
+        _assetManager.LoadAll(GraphicsDevice, contentRoot);
+
+        // Initialize audio (graceful fallback if no audio files)
+        _audioManager = new AudioManager();
+        _audioManager.LoadAll(contentRoot);
+        _audioManager.MasterVolume = _settings.MasterVolume;
+        _audioManager.MusicVolume = _settings.MusicVolume;
+        _audioManager.SfxVolume = _settings.SfxVolume;
+        _audioManager.AmbientVolume = _settings.AmbientVolume;
 
         // Start at menu
-        var menuState = new MenuState(this, _input, _font);
+        var menuState = new MenuState(this, _input, _font, _audioManager);
         _stateManager.PushState(menuState);
     }
 
@@ -196,7 +215,7 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
         var playerSprite = new ActorSprite(player, playerStartX, playerStartY, Color.Cyan, "Hero");
         if (_assetManager?.PlayerSheet != null) playerSprite.SpriteSheet = _assetManager.PlayerSheet;
         playerSprite.SnapVisualToTile(chunkManager);
-        var playerController = new PlayerController(playerSprite, chunkManager);
+        var playerController = new PlayerController(playerSprite, chunkManager, _audioManager);
 
         // Create scenario NPCs
         var npcControllers = new List<NpcController>();
@@ -278,7 +297,7 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
                 npcSprite.IsAdversary = AdversaryCalculator.IsAdversary(playerAlignment, def.alignment, seed);
             }
 
-            npcControllers.Add(new NpcController(npcSprite, chunkManager));
+            npcControllers.Add(new NpcController(npcSprite, chunkManager, _audioManager));
         }
 
         // Give player starting gold and equipment
@@ -333,23 +352,38 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
                         npcActor.Skills.Add(new Skill { Id = 1, Type = combatSkillType, Level = apprenticeSkillLevel });
                     npcActor.Gold = 25;
                     break;
+
+                case "Mage":
+                    // Mage: Magic skill + spells (no weapon)
+                    var magicSkillType = _repository.GetSkillTypes().Find(s => s.Name == "Magic");
+                    var journeymanSkillLevel = _repository.GetSkillLevels().Find(s => s.Name == "Journeyman");
+                    if (magicSkillType != null && journeymanSkillLevel != null)
+                    {
+                        var magicSkill = new Skill { Id = 1, Type = magicSkillType, Level = journeymanSkillLevel };
+                        var operations = _repository.GetOperations();
+                        var magicMissile = operations.Find(o => o.Name == "Magic Missile");
+                        var fireball = operations.Find(o => o.Name == "Fireball");
+                        if (magicMissile != null) magicSkill.ConferredOperationList.Add(magicMissile);
+                        if (fireball != null) magicSkill.ConferredOperationList.Add(fireball);
+                        npcActor.Skills.Add(magicSkill);
+                    }
+                    break;
             }
         }
 
         // Create combat manager
-        var combatManager = new CombatManager(_repository);
+        var combatManager = new CombatManager(_repository, _audioManager);
 
         // Create UI
-        var uiManager = new UIManager(_pixelTexture, _font, player, GraphicsDevice.Viewport, combatManager);
+        var followerControllers = new List<FollowerController>();
+        var uiManager = new UIManager(_pixelTexture, _font, player, GraphicsDevice.Viewport, combatManager,
+            _repository, followerControllers, _audioManager);
 
         // Create conversation runner
-        var conversationRunner = new ConversationRunner(_repository, player, "Soldier");
-
-        // Create playing state
-        var followerControllers = new List<FollowerController>();
+        var conversationRunner = new ConversationRunner(_repository, player, "Soldier", _audioManager);
         _playingState = new PlayingState(this, _input, _font, chunkManager, renderer, camera,
             playerController, npcControllers, followerControllers, uiManager, conversationRunner,
-            _repository, combatManager);
+            _repository, combatManager, _audioManager);
         _playingState.Font = _font;
 
         // Center camera on player
@@ -416,7 +450,7 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
         playerSprite.Facing = (FacingDirection)playerData.Facing;
         if (_assetManager?.PlayerSheet != null) playerSprite.SpriteSheet = _assetManager.PlayerSheet;
         playerSprite.SnapVisualToTile(chunkManager);
-        var playerController = new PlayerController(playerSprite, chunkManager);
+        var playerController = new PlayerController(playerSprite, chunkManager, _audioManager);
 
         // Restore NPCs and followers
         var npcControllers = new List<NpcController>();
@@ -466,9 +500,9 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
             npcSprite.SnapVisualToTile(chunkManager);
 
             if (npcData.IsFollower)
-                followerControllers.Add(new FollowerController(npcSprite, chunkManager));
+                followerControllers.Add(new FollowerController(npcSprite, chunkManager, _audioManager));
             else
-                npcControllers.Add(new NpcController(npcSprite, chunkManager));
+                npcControllers.Add(new NpcController(npcSprite, chunkManager, _audioManager));
         }
 
         // Restore camera
@@ -476,18 +510,19 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
         camera.Zoom = saveData.Camera.Zoom;
 
         // Create combat manager
-        var combatManager = new CombatManager(_repository);
+        var combatManager = new CombatManager(_repository, _audioManager);
 
         // Create UI
-        var uiManager = new UIManager(_pixelTexture, _font, player, GraphicsDevice.Viewport, combatManager);
+        var uiManager = new UIManager(_pixelTexture, _font, player, GraphicsDevice.Viewport, combatManager,
+            _repository, followerControllers, _audioManager);
 
         // Create conversation runner
-        var conversationRunner = new ConversationRunner(_repository, player, "Soldier");
+        var conversationRunner = new ConversationRunner(_repository, player, "Soldier", _audioManager);
 
         // Create playing state
         _playingState = new PlayingState(this, _input, _font, chunkManager, renderer, camera,
             playerController, npcControllers, followerControllers, uiManager, conversationRunner,
-            _repository, combatManager);
+            _repository, combatManager, _audioManager);
         _playingState.Font = _font;
 
         // Restore time of day
@@ -513,12 +548,21 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
     {
         var skillTypes = _repository.GetSkillTypes();
         var skillLevels = _repository.GetSkillLevels();
+        var allOperations = _repository.GetOperations();
         foreach (var saved in savedSkills)
         {
             var type = skillTypes.Find(t => t.Id == saved.SkillTypeId);
             var level = skillLevels.Find(l => l.Id == saved.SkillLevelId);
             if (type != null && level != null)
-                targetSkills.Add(new Skill { Id = targetSkills.Count + 1, Type = type, Level = level });
+            {
+                var skill = new Skill { Id = targetSkills.Count + 1, Type = type, Level = level };
+                foreach (var opId in saved.OperationIds)
+                {
+                    var op = allOperations.Find(o => o.Id == opId);
+                    if (op != null) skill.ConferredOperationList.Add(op);
+                }
+                targetSkills.Add(skill);
+            }
         }
     }
 
@@ -596,6 +640,13 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
     {
         _settings.ResolutionIndex = _resolutionIndex;
         _settings.IsFullScreen = _graphics.IsFullScreen;
+        if (_audioManager != null)
+        {
+            _settings.MasterVolume = _audioManager.MasterVolume;
+            _settings.MusicVolume = _audioManager.MusicVolume;
+            _settings.SfxVolume = _audioManager.SfxVolume;
+            _settings.AmbientVolume = _audioManager.AmbientVolume;
+        }
         _settings.Save();
     }
 
@@ -674,6 +725,12 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
 
         _stateManager.Update(gameTime);
         base.Update(gameTime);
+    }
+
+    protected override void UnloadContent()
+    {
+        _audioManager?.Dispose();
+        base.UnloadContent();
     }
 
     protected override void Draw(GameTime gameTime)

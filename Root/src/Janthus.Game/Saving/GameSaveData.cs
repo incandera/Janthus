@@ -55,6 +55,7 @@ public class SkillSaveData
 {
     public int SkillTypeId { get; set; }
     public int SkillLevelId { get; set; }
+    public List<int> OperationIds { get; set; } = new();
 }
 
 public class CameraSaveData

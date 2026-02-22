@@ -1,24 +1,29 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Janthus.Game.Audio;
 using Janthus.Game.Input;
 
 namespace Janthus.Game.UI;
 
 public class PauseMenuPanel : UIPanel
 {
-    private readonly string[] _options = { "Resume", "Save", "Load", "Quit" };
+    private readonly string[] _options = { "Resume", "Save", "Load", "Main Menu", "Quit" };
     private int _selectedIndex;
+    private AudioManager _audioManager;
 
     public bool ResumeRequested { get; set; }
     public bool SaveRequested { get; set; }
     public bool LoadRequested { get; set; }
+    public bool MainMenuRequested { get; set; }
     public bool QuitRequested { get; set; }
 
-    public PauseMenuPanel(Texture2D pixelTexture, SpriteFont font, Rectangle bounds)
+    public PauseMenuPanel(Texture2D pixelTexture, SpriteFont font, Rectangle bounds,
+                          AudioManager audioManager = null)
         : base(pixelTexture, font, bounds)
     {
         IsVisible = false;
+        _audioManager = audioManager;
     }
 
     public override void Update(GameTime gameTime, InputManager input)
@@ -28,11 +33,13 @@ public class PauseMenuPanel : UIPanel
         if (input.IsKeyPressed(Keys.Up) || input.IsKeyPressed(Keys.W) || input.ScrollDelta > 0)
         {
             _selectedIndex = (_selectedIndex - 1 + _options.Length) % _options.Length;
+            _audioManager?.PlaySound(SoundId.UINavigate);
         }
 
         if (input.IsKeyPressed(Keys.Down) || input.IsKeyPressed(Keys.S) || input.ScrollDelta < 0)
         {
             _selectedIndex = (_selectedIndex + 1) % _options.Length;
+            _audioManager?.PlaySound(SoundId.UINavigate);
         }
 
         // Mouse click to select and activate
@@ -59,6 +66,7 @@ public class PauseMenuPanel : UIPanel
 
     private void ActivateSelected()
     {
+        _audioManager?.PlaySound(SoundId.UISelect);
         switch (_selectedIndex)
         {
             case 0: // Resume
@@ -70,7 +78,10 @@ public class PauseMenuPanel : UIPanel
             case 2: // Load
                 LoadRequested = true;
                 break;
-            case 3: // Quit
+            case 3: // Main Menu
+                MainMenuRequested = true;
+                break;
+            case 4: // Quit
                 QuitRequested = true;
                 break;
         }

@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Janthus.Game.Audio;
 using Janthus.Game.Input;
 using Janthus.Game.Saving;
 
@@ -11,16 +12,18 @@ public class MenuState : IGameState
     private readonly JanthusGame _game;
     private readonly InputManager _input;
     private readonly SpriteFont _font;
+    private readonly AudioManager _audioManager;
 
     private readonly string[] _menuItems;
     private readonly bool _hasContinue;
     private int _selectedIndex;
 
-    public MenuState(JanthusGame game, InputManager input, SpriteFont font)
+    public MenuState(JanthusGame game, InputManager input, SpriteFont font, AudioManager audioManager)
     {
         _game = game;
         _input = input;
         _font = font;
+        _audioManager = audioManager;
 
         _hasContinue = SaveManager.AnySavesExist();
         _menuItems = _hasContinue
@@ -28,21 +31,32 @@ public class MenuState : IGameState
             : new[] { "New Game", "Options", "Quit" };
     }
 
-    public void Enter() { }
+    public void Enter()
+    {
+        _audioManager.PlayMusic(MusicId.Menu);
+    }
+
     public void Exit() { }
 
     public void Update(GameTime gameTime)
     {
         // Menu navigation (keyboard + mousewheel)
         if (_input.IsKeyPressed(Keys.Up) || _input.ScrollDelta > 0)
+        {
             _selectedIndex = (_selectedIndex - 1 + _menuItems.Length) % _menuItems.Length;
+            _audioManager.PlaySound(SoundId.UINavigate);
+        }
         if (_input.IsKeyPressed(Keys.Down) || _input.ScrollDelta < 0)
+        {
             _selectedIndex = (_selectedIndex + 1) % _menuItems.Length;
+            _audioManager.PlaySound(SoundId.UINavigate);
+        }
 
         // Select
         if (_input.IsKeyPressed(Keys.Enter) &&
             !_input.IsKeyDown(Keys.LeftAlt) && !_input.IsKeyDown(Keys.RightAlt))
         {
+            _audioManager.PlaySound(SoundId.UISelect);
             var selected = _menuItems[_selectedIndex];
             switch (selected)
             {
@@ -55,7 +69,7 @@ public class MenuState : IGameState
                     _game.StartPlaying();
                     break;
                 case "Options":
-                    var options = new OptionsState(_game, _input, _font);
+                    var options = new OptionsState(_game, _input, _font, _audioManager);
                     _game.StateManager.PushState(options);
                     break;
                 case "Quit":

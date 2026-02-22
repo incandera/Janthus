@@ -8,4 +8,5 @@ public class Operation : JanthusObject
     public decimal BasePower { get; set; }
     public decimal ManaCost { get; set; }
     public double CooldownSeconds { get; set; }
+    public float Range { get; set; } = 1.0f;
 }

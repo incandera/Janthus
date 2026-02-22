@@ -229,7 +229,10 @@ public static class SaveManager
 
             foreach (var skill in pc.Skills)
             {
-                data.Skills.Add(new SkillSaveData { SkillTypeId = skill.Type.Id, SkillLevelId = skill.Level.Id });
+                var skillData = new SkillSaveData { SkillTypeId = skill.Type.Id, SkillLevelId = skill.Level.Id };
+                foreach (var op in skill.ConferredOperationList)
+                    skillData.OperationIds.Add(op.Id);
+                data.Skills.Add(skillData);
             }
         }
         else if (actor is NonPlayerCharacter npc)
@@ -245,7 +248,10 @@ public static class SaveManager
 
             foreach (var skill in npc.Skills)
             {
-                data.Skills.Add(new SkillSaveData { SkillTypeId = skill.Type.Id, SkillLevelId = skill.Level.Id });
+                var skillData = new SkillSaveData { SkillTypeId = skill.Type.Id, SkillLevelId = skill.Level.Id };
+                foreach (var op in skill.ConferredOperationList)
+                    skillData.OperationIds.Add(op.Id);
+                data.Skills.Add(skillData);
             }
         }
 

@@ -139,6 +139,86 @@ public static class CombatCalculator
         return true;
     }
 
+    // ---------------------------------------------------------------
+    // Magic combat methods
+    // ---------------------------------------------------------------
+
+    public static decimal CalculateMagicAttackRating(LeveledActor actor, List<Skill> skills,
+                                                      Operation spell, IGameDataProvider dataProvider)
+    {
+        var baseRating = actor.EffectiveIntelligence * 1.5m + spell.BasePower;
+        var skillMod = GetMagicSkillModifier(skills, dataProvider);
+        return baseRating * (1.0m + skillMod * 0.5m);
+    }
+
+    public static decimal CalculateMagicResistance(LeveledActor actor, List<Skill> skills,
+                                                    IGameDataProvider dataProvider)
+    {
+        var baseRating = actor.EffectiveWillpower * 0.5m + actor.EffectiveAttunement * 0.3m
+                         + actor.TotalEquipmentArmorRating * 0.2m;
+        var skillMod = GetMagicSkillModifier(skills, dataProvider);
+        return baseRating * (1.0m + skillMod * 0.3m);
+    }
+
+    public static bool RollMagicHit(LeveledActor attacker, List<Skill> attackerSkills,
+                                     LeveledActor defender, IGameDataProvider dataProvider, Random rng)
+    {
+        var magicSkill = GetMagicSkillModifier(attackerSkills, dataProvider);
+        var hitChance = 0.75m + (attacker.EffectiveAttunement - defender.EffectiveWillpower) * 0.03m
+                        + magicSkill * 0.15m;
+        hitChance = Math.Clamp(hitChance, 0.15m, 0.95m);
+        return (decimal)rng.NextDouble() < hitChance;
+    }
+
+    public static int CalculateMagicDamage(LeveledActor attacker, List<Skill> attackerSkills,
+                                            Operation spell,
+                                            LeveledActor defender, List<Skill> defenderSkills,
+                                            IGameDataProvider dataProvider, Random rng)
+    {
+        var magicAttack = CalculateMagicAttackRating(attacker, attackerSkills, spell, dataProvider);
+        var magicResist = CalculateMagicResistance(defender, defenderSkills, dataProvider);
+
+        var rawDamage = Math.Max(1m, magicAttack - magicResist * 0.5m);
+
+        // Size ratio modifier (same as physical)
+        var defenderSize = defender.SizeMultiplier == 0 ? 1m : defender.SizeMultiplier;
+        var attackerSize = attacker.SizeMultiplier == 0 ? 1m : attacker.SizeMultiplier;
+        var sizeRatio = Math.Clamp(attackerSize / defenderSize, 0.25m, 4.0m);
+
+        decimal sizeMod;
+        if (sizeRatio < 1m)
+            sizeMod = sizeRatio;
+        else
+            sizeMod = 1m + (sizeRatio - 1m) * 0.5m;
+
+        // Luck swing (same as physical)
+        var netLuck = attacker.EffectiveLuck - defender.EffectiveLuck;
+        var variance = 0.04m * Math.Abs(netLuck);
+        var bias = 0.02m * netLuck;
+        var luckRoll = (decimal)(rng.NextDouble() * 2 - 1);
+        var luckMod = Math.Clamp(1.0m + bias + luckRoll * variance, 0.5m, 2.0m);
+
+        var finalDamage = Math.Max(1, (int)Math.Round(rawDamage * sizeMod * luckMod));
+        return finalDamage;
+    }
+
+    public static Operation SelectOperation(LeveledActor actor, List<Skill> skills, float distanceToTarget)
+    {
+        Operation best = null;
+        foreach (var skill in skills)
+        {
+            foreach (var op in skill.ConferredOperationList)
+            {
+                if (op.Range < distanceToTarget) continue;
+                if (op.ManaCost > actor.CurrentMana) continue;
+                if (op.BasePower <= 0) continue;
+                if (best == null || op.BasePower > best.BasePower)
+                    best = op;
+            }
+        }
+        return best;
+    }
+
     private static decimal GetCombatSkillModifier(List<Skill> skills, IGameDataProvider dataProvider)
     {
         var combatSkill = skills.Find(s => s.Type != null && s.Type.Name == "Combat");
@@ -146,6 +226,18 @@ public static class CombatCalculator
 
         var skillLevels = dataProvider.GetSkillLevels();
         var level = skillLevels.Find(sl => sl.Name == combatSkill.Level.Name);
+        if (level == null) return 0m;
+
+        return (level.ConferredEffectivenessMinimum + level.ConferredEffectivenessMaximum) / 2.0m;
+    }
+
+    private static decimal GetMagicSkillModifier(List<Skill> skills, IGameDataProvider dataProvider)
+    {
+        var magicSkill = skills.Find(s => s.Type != null && s.Type.Name == "Magic");
+        if (magicSkill?.Level == null) return 0m;
+
+        var skillLevels = dataProvider.GetSkillLevels();
+        var level = skillLevels.Find(sl => sl.Name == magicSkill.Level.Name);
         if (level == null) return 0m;
 
         return (level.ConferredEffectivenessMinimum + level.ConferredEffectivenessMaximum) / 2.0m;

@@ -1,5 +1,6 @@
 using Janthus.Model.Entities;
 using Janthus.Model.Services;
+using Janthus.Game.Audio;
 
 namespace Janthus.Game.Conversation;
 
@@ -26,13 +27,25 @@ public class ConversationRunner
         set => _actionExecutor.OnRecruitFollower = value;
     }
 
+    public Action<string> OnQuestStarted
+    {
+        get => _actionExecutor.OnQuestStarted;
+        set => _actionExecutor.OnQuestStarted = value;
+    }
+
+    public Action<string> OnQuestCompleted
+    {
+        get => _actionExecutor.OnQuestCompleted;
+        set => _actionExecutor.OnQuestCompleted = value;
+    }
+
     public ConversationRunner(IGameDataProvider dataProvider, PlayerCharacter player,
-                              string playerClassName)
+                              string playerClassName, AudioManager audioManager)
     {
         _dataProvider = dataProvider;
         _player = player;
         _playerClassName = playerClassName;
-        _actionExecutor = new ConversationActionExecutor(dataProvider, player);
+        _actionExecutor = new ConversationActionExecutor(dataProvider, player, audioManager);
     }
 
     public bool TryStartConversation(string npcName)

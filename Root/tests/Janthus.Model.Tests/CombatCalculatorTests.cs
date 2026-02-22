@@ -866,4 +866,312 @@ public class CombatCalculatorTests : IDisposable
 
         Assert.Null(actor.Inventory.Find(i => i.Item.Id == potion.Id));
     }
+
+    // ---------------------------------------------------------------
+    // Magic combat — helper factories
+    // ---------------------------------------------------------------
+
+    private Skill MakeMagicSkill(string levelName)
+    {
+        var magicType = _repository.GetSkillTypes().Find(s => s.Name == "Magic");
+        var level = _repository.GetSkillLevels().Find(l => l.Name == levelName);
+        return new Skill { Id = 2, Type = magicType, Level = level };
+    }
+
+    private static Operation MakeSpell(int id, string name, decimal basePower, decimal manaCost, float range)
+    {
+        return new Operation
+        {
+            Id = id, Name = name, BasePower = basePower, ManaCost = manaCost,
+            Range = range, EffectType = EffectType.Magical, CooldownSeconds = 1.5
+        };
+    }
+
+    // ---------------------------------------------------------------
+    // Magic Attack Rating — base formula
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void MagicAttackRating_NoSkill_UsesIntelligence()
+    {
+        // Formula: EffectiveInt * 1.5 + BasePower, no skill = ×1.0
+        var actor = MakeActor(5, 5, 8, 5, 5, 5, 5);
+        var spell = MakeSpell(1, "Test Spell", 10, 5, 6f);
+
+        var mar = CombatCalculator.CalculateMagicAttackRating(actor, new List<Skill>(), spell, _repository);
+
+        // 8 * 1.5 + 10 = 22.0
+        Assert.Equal(22.0m, mar);
+    }
+
+    [Theory]
+    [InlineData("Novice", 0.1)]
+    [InlineData("Apprentice", 0.3)]
+    [InlineData("Journeyman", 0.5)]
+    [InlineData("Expert", 0.7)]
+    [InlineData("Master", 0.9)]
+    public void MagicAttackRating_MagicSkill_AppliesMultiplier(string levelName, double expectedMod)
+    {
+        var player = MakePlayer(5, 5, 10, 5, 5, 5, 5);
+        player.Skills.Add(MakeMagicSkill(levelName));
+        var spell = MakeSpell(1, "Test Spell", 8, 5, 6f);
+
+        var mar = CombatCalculator.CalculateMagicAttackRating(player, player.Skills, spell, _repository);
+
+        // baseRating = 10 * 1.5 + 8 = 23; result = 23 * (1 + mod * 0.5)
+        var expected = 23.0m * (1.0m + (decimal)expectedMod * 0.5m);
+        Assert.Equal(expected, mar);
+    }
+
+    // ---------------------------------------------------------------
+    // Magic Resistance — base formula
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void MagicResistance_UsesWillpowerAndAttunement()
+    {
+        // Formula: (EffectiveWillpower * 0.5 + EffectiveAttunement * 0.3 + EquipAR * 0.2) * skillMod
+        var actor = MakeActor(5, 5, 5, 5, 8, 5, 10);
+
+        var mr = CombatCalculator.CalculateMagicResistance(actor, new List<Skill>(), _repository);
+
+        // 10 * 0.5 + 8 * 0.3 + 0 * 0.2 = 5.0 + 2.4 = 7.4
+        Assert.Equal(7.4m, mr);
+    }
+
+    // ---------------------------------------------------------------
+    // Magic Damage — full calculation
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void MagicDamage_EqualStats_ProducesReasonableOutput()
+    {
+        var attacker = MakePlayer(5, 5, 8, 5, 6, 5, 5);
+        var defender = MakeNpc(5, 5, 5, 5, 5, 5, 8);
+        var spell = MakeSpell(1, "Magic Missile", 8, 5, 6f);
+
+        var rng = new Random(42);
+        var dmg = CombatCalculator.CalculateMagicDamage(
+            attacker, new List<Skill>(), spell, defender, new List<Skill>(), _repository, rng);
+
+        Assert.True(dmg >= 1, "Magic damage should be at least 1");
+    }
+
+    [Fact]
+    public void MagicDamage_HighIntelligence_IncreasedDamage()
+    {
+        var weakAttacker = MakePlayer(5, 5, 5, 5, 5, 5, 5);
+        var strongAttacker = MakePlayer(5, 5, 15, 5, 5, 5, 5);
+        var defender = MakeNpc(5, 5, 5, 5, 5, 5, 5);
+        var spell = MakeSpell(1, "Magic Missile", 8, 5, 6f);
+
+        var rng1 = new Random(42);
+        var dmgWeak = CombatCalculator.CalculateMagicDamage(
+            weakAttacker, new List<Skill>(), spell, defender, new List<Skill>(), _repository, rng1);
+        var rng2 = new Random(42);
+        var dmgStrong = CombatCalculator.CalculateMagicDamage(
+            strongAttacker, new List<Skill>(), spell, defender, new List<Skill>(), _repository, rng2);
+
+        Assert.True(dmgStrong > dmgWeak,
+            $"High intelligence should increase magic damage: strong={dmgStrong}, weak={dmgWeak}");
+    }
+
+    [Fact]
+    public void MagicDamage_HighWillpowerDefender_ReducedDamage()
+    {
+        var attacker = MakePlayer(5, 5, 10, 5, 6, 5, 5);
+        var weakDefender = MakeNpc(5, 5, 5, 5, 3, 5, 3);
+        var strongDefender = MakeNpc(5, 5, 5, 5, 8, 5, 15);
+        var spell = MakeSpell(1, "Magic Missile", 8, 5, 6f);
+
+        var rng1 = new Random(42);
+        var dmgVsWeak = CombatCalculator.CalculateMagicDamage(
+            attacker, new List<Skill>(), spell, weakDefender, new List<Skill>(), _repository, rng1);
+        var rng2 = new Random(42);
+        var dmgVsStrong = CombatCalculator.CalculateMagicDamage(
+            attacker, new List<Skill>(), spell, strongDefender, new List<Skill>(), _repository, rng2);
+
+        Assert.True(dmgVsStrong < dmgVsWeak,
+            $"High willpower defender should take less damage: vsStrong={dmgVsStrong}, vsWeak={dmgVsWeak}");
+    }
+
+    // ---------------------------------------------------------------
+    // Magic Hit — probability
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void RollMagicHit_BaseChance75Percent()
+    {
+        var attacker = MakePlayer(5, 5, 5, 5, 5, 5, 5);
+        var defender = MakeNpc(5, 5, 5, 5, 5, 5, 5);
+
+        int hits = 0;
+        int trials = 10000;
+        for (int i = 0; i < trials; i++)
+        {
+            if (CombatCalculator.RollMagicHit(attacker, new List<Skill>(), defender, _repository, new Random(i)))
+                hits++;
+        }
+
+        double hitRate = (double)hits / trials;
+        Assert.True(hitRate > 0.70 && hitRate < 0.80,
+            $"Base magic hit rate should be ~75%, got {hitRate:P1}");
+    }
+
+    [Fact]
+    public void RollMagicHit_HighAttunement_IncreasesChance()
+    {
+        var attacker = MakePlayer(5, 5, 5, 5, 10, 5, 5); // att 10
+        var defender = MakeNpc(5, 5, 5, 5, 3, 5, 5);     // will 5
+
+        int hits = 0;
+        int trials = 10000;
+        for (int i = 0; i < trials; i++)
+        {
+            if (CombatCalculator.RollMagicHit(attacker, new List<Skill>(), defender, _repository, new Random(i)))
+                hits++;
+        }
+
+        double hitRate = (double)hits / trials;
+        // 0.75 + (10-5)*0.03 = 0.75 + 0.15 = 0.90
+        Assert.True(hitRate > 0.85 && hitRate < 0.95,
+            $"High attunement should give ~90% magic hit rate, got {hitRate:P1}");
+    }
+
+    [Fact]
+    public void RollMagicHit_CappedAt95Percent()
+    {
+        var attacker = MakePlayer(5, 5, 5, 5, 30, 5, 5);
+        attacker.Skills.Add(MakeMagicSkill("Master"));
+        var defender = MakeNpc(5, 5, 5, 5, 1, 5, 1);
+
+        int hits = 0;
+        int trials = 10000;
+        for (int i = 0; i < trials; i++)
+        {
+            if (CombatCalculator.RollMagicHit(attacker, attacker.Skills, defender, _repository, new Random(i)))
+                hits++;
+        }
+
+        double hitRate = (double)hits / trials;
+        Assert.True(hitRate > 0.92 && hitRate < 0.98,
+            $"Magic hit chance should be capped near 95%, got {hitRate:P1}");
+    }
+
+    [Fact]
+    public void RollMagicHit_FloorAt15Percent()
+    {
+        var attacker = MakePlayer(5, 5, 5, 5, 1, 5, 1);
+        var defender = MakeNpc(5, 5, 5, 5, 5, 5, 30);
+
+        int hits = 0;
+        int trials = 10000;
+        for (int i = 0; i < trials; i++)
+        {
+            if (CombatCalculator.RollMagicHit(attacker, new List<Skill>(), defender, _repository, new Random(i)))
+                hits++;
+        }
+
+        double hitRate = (double)hits / trials;
+        Assert.True(hitRate > 0.11 && hitRate < 0.19,
+            $"Magic hit chance floor should be ~15%, got {hitRate:P1}");
+    }
+
+    // ---------------------------------------------------------------
+    // SelectOperation — spell selection
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void SelectOperation_PicksHighestPowerInRange()
+    {
+        var actor = MakePlayer(5, 5, 10, 5, 8, 5, 5);
+        actor.CurrentMana = 100;
+        var magicMissile = MakeSpell(1, "Magic Missile", 8, 5, 6f);
+        var fireball = MakeSpell(2, "Fireball", 18, 15, 5f);
+        var skill = MakeMagicSkill("Journeyman");
+        skill.ConferredOperationList.Add(magicMissile);
+        skill.ConferredOperationList.Add(fireball);
+        actor.Skills.Add(skill);
+
+        var selected = CombatCalculator.SelectOperation(actor, actor.Skills, 4.0f);
+
+        Assert.NotNull(selected);
+        Assert.Equal("Fireball", selected.Name);
+    }
+
+    [Fact]
+    public void SelectOperation_RespectsManaCost()
+    {
+        var actor = MakePlayer(5, 5, 10, 5, 8, 5, 5);
+        actor.CurrentMana = 10; // enough for Magic Missile (5) but not Fireball (15)
+        var magicMissile = MakeSpell(1, "Magic Missile", 8, 5, 6f);
+        var fireball = MakeSpell(2, "Fireball", 18, 15, 5f);
+        var skill = MakeMagicSkill("Journeyman");
+        skill.ConferredOperationList.Add(magicMissile);
+        skill.ConferredOperationList.Add(fireball);
+        actor.Skills.Add(skill);
+
+        var selected = CombatCalculator.SelectOperation(actor, actor.Skills, 4.0f);
+
+        Assert.NotNull(selected);
+        Assert.Equal("Magic Missile", selected.Name);
+    }
+
+    [Fact]
+    public void SelectOperation_NoOperations_ReturnsNull()
+    {
+        var actor = MakePlayer(5, 5, 5, 5, 5, 8, 5);
+        actor.CurrentMana = 100;
+        // No skills with operations — melee-only actor
+
+        var selected = CombatCalculator.SelectOperation(actor, actor.Skills, 1.0f);
+
+        Assert.Null(selected);
+    }
+
+    // ---------------------------------------------------------------
+    // Effective attributes — equipment bonuses (Intelligence, Attunement, Willpower)
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void EffectiveIntelligence_IncludesEquipmentBonus()
+    {
+        var player = MakePlayer(5, 5, 8, 5, 5, 5, 5);
+        var amulet = new Item
+        {
+            Id = 200, Name = "Arcane Amulet", Slot = EquipmentSlot.Accessory,
+            IntelligenceBonus = 3
+        };
+        EquipItem(player, amulet);
+
+        Assert.Equal(11, player.EffectiveIntelligence);
+    }
+
+    [Fact]
+    public void EffectiveAttunement_IncludesEquipmentBonus()
+    {
+        var player = MakePlayer(5, 5, 5, 5, 6, 5, 5);
+        var amulet = new Item
+        {
+            Id = 201, Name = "Mystic Amulet", Slot = EquipmentSlot.Accessory,
+            AttunementBonus = 4
+        };
+        EquipItem(player, amulet);
+
+        Assert.Equal(10, player.EffectiveAttunement);
+    }
+
+    [Fact]
+    public void EffectiveWillpower_IncludesEquipmentBonus()
+    {
+        var player = MakePlayer(5, 5, 5, 5, 5, 5, 7);
+        var helmet = new Item
+        {
+            Id = 202, Name = "Helm of Will", Slot = EquipmentSlot.Helmet,
+            WillpowerBonus = 2
+        };
+        EquipItem(player, helmet);
+
+        Assert.Equal(9, player.EffectiveWillpower);
+    }
 }

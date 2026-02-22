@@ -29,6 +29,9 @@ public class JanthusDbContext : DbContext
     public DbSet<MerchantStock> MerchantStocks { get; set; }
     public DbSet<InspectDescription> InspectDescriptions { get; set; }
     public DbSet<InspectCondition> InspectConditions { get; set; }
+    public DbSet<QuestDefinition> QuestDefinitions { get; set; }
+    public DbSet<QuestGoal> QuestGoals { get; set; }
+    public DbSet<Operation> Operations { get; set; }
 
     public JanthusDbContext(DbContextOptions<JanthusDbContext> options) : base(options) { }
 
@@ -218,6 +221,32 @@ public class JanthusDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Value).HasMaxLength(200);
             entity.HasIndex(e => e.InspectDescriptionId);
+        });
+
+        modelBuilder.Entity<QuestDefinition>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Description).HasMaxLength(2000);
+            entity.Property(e => e.ActivationFlag).HasMaxLength(100);
+            entity.Property(e => e.CompletionFlag).HasMaxLength(100);
+            entity.Property(e => e.FailureFlag).HasMaxLength(100);
+            entity.Ignore(e => e.Goals);
+        });
+
+        modelBuilder.Entity<QuestGoal>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Description).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.CompletionFlag).HasMaxLength(100);
+            entity.HasIndex(e => e.QuestDefinitionId);
+        });
+
+        modelBuilder.Entity<Operation>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Ignore(e => e.InternalId);
         });
 
         SeedData.Apply(modelBuilder);

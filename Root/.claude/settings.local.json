@@ -24,7 +24,14 @@
       "WebFetch(domain:clintbellanger.net)",
       "WebFetch(domain:itch.io)",
       "WebFetch(domain:kenney-assets.itch.io)",
-      "WebFetch(domain:pvgames.itch.io)"
+      "WebFetch(domain:pvgames.itch.io)",
+      "WebFetch(domain:deepwiki.com)",
+      "WebFetch(domain:kenney.nl)",
+      "WebFetch(domain:tommusic.itch.io)",
+      "WebFetch(domain:community.monogame.net)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:leohpaz.itch.io)",
+      "WebFetch(domain:gravitysound.studio)"
     ]
   }
 }

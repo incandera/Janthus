@@ -1,5 +1,6 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
+using Janthus.Game.Audio;
 using Janthus.Game.Input;
 using Janthus.Game.World;
 
@@ -9,14 +10,16 @@ public class PlayerController
 {
     public ActorSprite Sprite { get; }
     private readonly ChunkManager _chunkManager;
+    private readonly AudioManager _audioManager;
     private float _moveTimer;
     private const float MoveInterval = 0.15f;
     private List<Point> _path;
 
-    public PlayerController(ActorSprite sprite, ChunkManager chunkManager)
+    public PlayerController(ActorSprite sprite, ChunkManager chunkManager, AudioManager audioManager)
     {
         Sprite = sprite;
         _chunkManager = chunkManager;
+        _audioManager = audioManager;
     }
 
     public void SetPath(List<Point> path)
@@ -71,6 +74,8 @@ public class PlayerController
             {
                 Sprite.SetTilePosition(newX, newY, _chunkManager);
                 _moveTimer = MoveInterval;
+                var stepTile = _chunkManager.GetTile(newX, newY);
+                _audioManager.PlayFootstep(stepTile?.Name ?? "Dirt");
             }
             return;
         }
@@ -85,6 +90,8 @@ public class PlayerController
             {
                 Sprite.SetTilePosition(next.X, next.Y, _chunkManager);
                 _moveTimer = MoveInterval;
+                var stepTile = _chunkManager.GetTile(next.X, next.Y);
+                _audioManager.PlayFootstep(stepTile?.Name ?? "Dirt");
             }
             else
             {

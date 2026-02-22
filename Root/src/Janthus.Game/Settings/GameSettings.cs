@@ -6,6 +6,10 @@ public class GameSettings
 {
     public int ResolutionIndex { get; set; } = 1; // 1280x720
     public bool IsFullScreen { get; set; }
+    public float MasterVolume { get; set; } = 1.0f;
+    public float MusicVolume { get; set; } = 0.7f;
+    public float SfxVolume { get; set; } = 1.0f;
+    public float AmbientVolume { get; set; } = 0.6f;
 
     private static readonly string DirectoryPath =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Janthus");

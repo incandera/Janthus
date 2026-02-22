@@ -16,6 +16,8 @@ public class TradePanel : UIPanel
 
     private bool _playerSideActive; // true = player (sell), false = merchant (buy)
     private int _selectedIndex;
+    private int _playerScrollOffset;
+    private int _merchantScrollOffset;
     private string _statusMessage = string.Empty;
     private double _statusTimer;
     private bool _lootMode; // true = looting a corpse (free take, no sell)
@@ -43,6 +45,8 @@ public class TradePanel : UIPanel
         _dataProvider = dataProvider;
         _playerSideActive = false; // Start on merchant side (buy)
         _selectedIndex = 0;
+        _playerScrollOffset = 0;
+        _merchantScrollOffset = 0;
         _statusMessage = string.Empty;
         _statusTimer = 0;
         _lootMode = false;
@@ -58,6 +62,8 @@ public class TradePanel : UIPanel
         _dataProvider = null;
         _playerSideActive = false; // Start on corpse side (take)
         _selectedIndex = 0;
+        _playerScrollOffset = 0;
+        _merchantScrollOffset = 0;
         _statusMessage = string.Empty;
         _statusTimer = 0;
         _lootMode = true;
@@ -101,6 +107,9 @@ public class TradePanel : UIPanel
         if (input.IsKeyPressed(Keys.Down) || input.ScrollDelta < 0)
             _selectedIndex = (_selectedIndex + 1) % activeList.Count;
 
+        // Auto-scroll to keep selected item visible
+        EnsureSelectedVisible();
+
         // Enter to buy/sell/take
         if (input.IsKeyPressed(Keys.Enter))
         {
@@ -138,7 +147,7 @@ public class TradePanel : UIPanel
                 var localY = mouseY - itemsY;
                 if (localY >= 0)
                 {
-                    var clickedIndex = localY / ItemLineHeight;
+                    var clickedIndex = localY / ItemLineHeight + _playerScrollOffset;
                     if (clickedIndex >= 0 && clickedIndex < _player.Inventory.Count)
                         _selectedIndex = clickedIndex;
                 }
@@ -149,7 +158,7 @@ public class TradePanel : UIPanel
                 var localY = mouseY - itemsY;
                 if (localY >= 0)
                 {
-                    var clickedIndex = localY / ItemLineHeight;
+                    var clickedIndex = localY / ItemLineHeight + _merchantScrollOffset;
                     if (clickedIndex >= 0 && clickedIndex < _merchantInventory.Count)
                         _selectedIndex = clickedIndex;
                 }
@@ -284,6 +293,26 @@ public class TradePanel : UIPanel
         SetStatus($"Returned {itemName}");
     }
 
+    private int GetMaxVisibleItems()
+    {
+        var itemsStartY = Bounds.Y + PaddingTop + HeaderHeight + LineHeight + 5;
+        var columnsBottomY = Bounds.Bottom - DescriptionHeight - BottomBarHeight;
+        return (columnsBottomY - itemsStartY) / ItemLineHeight;
+    }
+
+    private void EnsureSelectedVisible()
+    {
+        var maxVisible = GetMaxVisibleItems();
+        if (maxVisible <= 0) return;
+
+        ref int scrollOffset = ref (_playerSideActive ? ref _playerScrollOffset : ref _merchantScrollOffset);
+
+        if (_selectedIndex < scrollOffset)
+            scrollOffset = _selectedIndex;
+        else if (_selectedIndex >= scrollOffset + maxVisible)
+            scrollOffset = _selectedIndex - maxVisible + 1;
+    }
+
     private decimal GetMerchantPriceMultiplier(Item item)
     {
         if (_merchant == null || _dataProvider == null) return 1.0m;
@@ -333,11 +362,11 @@ public class TradePanel : UIPanel
         var columnsBottomY = Bounds.Bottom - DescriptionHeight - BottomBarHeight;
         var maxItems = (columnsBottomY - itemsStartY) / ItemLineHeight;
         DrawItemList(spriteBatch, _player.Inventory, leftX, columnWidth, itemsStartY, maxItems,
-            _playerSideActive, true, _lootMode);
+            _playerSideActive, true, _lootMode, _playerScrollOffset);
 
         // Draw merchant/corpse inventory (right column)
         DrawItemList(spriteBatch, _merchantInventory, rightX, columnWidth, itemsStartY, maxItems,
-            !_playerSideActive, false, _lootMode);
+            !_playerSideActive, false, _lootMode, _merchantScrollOffset);
 
         // Vertical divider (between columns only, not into description area)
         var dividerX = Bounds.X + PaddingX + columnWidth + PaddingX / 2;
@@ -391,12 +420,22 @@ public class TradePanel : UIPanel
 
     private void DrawItemList(SpriteBatch spriteBatch, List<InventoryItem> items,
         int x, int width, int startY, int maxItems, bool isActiveSide, bool isSelling,
-        bool isLootMode = false)
+        bool isLootMode, int scrollOffset)
     {
         if (items == null) return;
 
+        // Scroll indicator (top)
+        if (scrollOffset > 0)
+        {
+            var arrowText = "-- more --";
+            var arrowSize = Font.MeasureString(arrowText);
+            spriteBatch.DrawString(Font, arrowText,
+                new Vector2(x + (width - arrowSize.X) / 2, startY - 14), Color.DarkGray);
+        }
+
         var y = startY;
-        for (int i = 0; i < Math.Min(items.Count, maxItems); i++)
+        var endIndex = Math.Min(items.Count, scrollOffset + maxItems);
+        for (int i = scrollOffset; i < endIndex; i++)
         {
             var inv = items[i];
 
@@ -438,6 +477,16 @@ public class TradePanel : UIPanel
             }
 
             y += ItemLineHeight;
+        }
+
+        // Scroll indicator (bottom) — draw inside the column area, replacing last item line
+        if (endIndex < items.Count)
+        {
+            var arrowText = "-- more --";
+            var arrowSize = Font.MeasureString(arrowText);
+            var arrowY = startY + (maxItems - 1) * ItemLineHeight + 2;
+            spriteBatch.DrawString(Font, arrowText,
+                new Vector2(x + (width - arrowSize.X) / 2, arrowY), Color.DarkGray);
         }
 
         if (items.Count == 0)

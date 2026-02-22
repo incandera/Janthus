@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Content\**\*.png;Content\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Content\**\*.png;Content\**\*.json;Content\**\*.wav;Content\**\*.ogg" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

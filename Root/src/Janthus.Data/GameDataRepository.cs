@@ -25,6 +25,9 @@ public class GameDataRepository : IGameDataProvider
     private List<MerchantStock> _merchantStock;
     private List<InspectDescription> _inspectDescriptions;
     private List<InspectCondition> _inspectConditions;
+    private List<QuestDefinition> _questDefinitions;
+    private List<QuestGoal> _questGoals;
+    private List<Operation> _operations;
 
     public GameDataRepository(JanthusDbContext context)
     {
@@ -288,6 +291,38 @@ public class GameDataRepository : IGameDataProvider
         }
 
         return descriptions;
+    }
+
+    public List<QuestDefinition> GetQuestDefinitions()
+    {
+        if (_questDefinitions == null)
+        {
+            _questDefinitions = _context.QuestDefinitions.OrderBy(q => q.SortOrder).ToList();
+            _questGoals ??= _context.QuestGoals.OrderBy(g => g.SortOrder).ToList();
+
+            foreach (var quest in _questDefinitions)
+            {
+                quest.Goals = _questGoals
+                    .Where(g => g.QuestDefinitionId == quest.Id).ToList();
+            }
+        }
+        return _questDefinitions;
+    }
+
+    public QuestDefinition GetQuestDefinition(int id)
+    {
+        return GetQuestDefinitions().SingleOrDefault(q => q.Id == id);
+    }
+
+    public List<Operation> GetOperations()
+    {
+        _operations ??= _context.Operations.OrderBy(x => x.Id).ToList();
+        return _operations;
+    }
+
+    public Operation GetOperation(int id)
+    {
+        return GetOperations().SingleOrDefault(x => x.Id == id);
     }
 
     public List<GameFlag> GetGameFlags()
