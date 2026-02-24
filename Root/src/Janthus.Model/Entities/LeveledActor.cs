@@ -106,7 +106,11 @@ public class LeveledActor : Actor
         return total;
     }
 
-    private readonly IGameDataProvider _dataProvider;
+    public int ExperiencePoints { get; set; }
+    public string ClassName { get; set; } = string.Empty;
+
+    private IGameDataProvider _dataProvider;
+    public IGameDataProvider DataProvider { set => _dataProvider = value; }
 
     private Dictionary<string, Func<CharacterAttribute>> AttributeAccessors => new()
     {

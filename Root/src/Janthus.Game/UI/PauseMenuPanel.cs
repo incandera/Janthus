@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using FontStashSharp;
 using Janthus.Game.Audio;
 using Janthus.Game.Input;
 
@@ -18,7 +19,7 @@ public class PauseMenuPanel : UIPanel
     public bool MainMenuRequested { get; set; }
     public bool QuitRequested { get; set; }
 
-    public PauseMenuPanel(Texture2D pixelTexture, SpriteFont font, Rectangle bounds,
+    public PauseMenuPanel(Texture2D pixelTexture, SpriteFontBase font, Rectangle bounds,
                           AudioManager audioManager = null)
         : base(pixelTexture, font, bounds)
     {
@@ -45,11 +46,11 @@ public class PauseMenuPanel : UIPanel
         // Mouse click to select and activate
         if (input.IsLeftClickPressed() && Bounds.Contains(input.MousePosition))
         {
-            var itemStartY = Bounds.Y + 60; // after title (20 + 40)
+            var itemStartY = Bounds.Y + 70; // after title (20 + 50)
             var localY = input.MousePosition.Y - itemStartY;
             if (localY >= 0)
             {
-                var clickedIndex = localY / 30;
+                var clickedIndex = localY / 34;
                 if (clickedIndex >= 0 && clickedIndex < _options.Length)
                 {
                     _selectedIndex = clickedIndex;
@@ -99,7 +100,7 @@ public class PauseMenuPanel : UIPanel
         var title = "PAUSED";
         var titleSize = Font.MeasureString(title);
         spriteBatch.DrawString(Font, title, new Vector2(x - titleSize.X / 2, y), Color.Gold);
-        y += 40;
+        y += 50;
 
         for (int i = 0; i < _options.Length; i++)
         {
@@ -108,7 +109,7 @@ public class PauseMenuPanel : UIPanel
             var text = prefix + _options[i];
             var textSize = Font.MeasureString(text);
             spriteBatch.DrawString(Font, text, new Vector2(x - textSize.X / 2, y), color);
-            y += 30;
+            y += 34;
         }
     }
 }

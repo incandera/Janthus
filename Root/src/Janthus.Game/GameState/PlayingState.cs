@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using FontStashSharp;
 using Janthus.Model.Entities;
 using Janthus.Model.Enums;
 using Janthus.Model.Services;
@@ -56,7 +57,7 @@ public class PlayingState : IGameState
     public List<LightSource> Lights => _lights;
     public VisibilityMap Visibility => _visibility;
 
-    public PlayingState(JanthusGame game, InputManager input, SpriteFont font,
+    public PlayingState(JanthusGame game, InputManager input, SpriteFontBase font,
                         ChunkManager chunkManager, IsometricRenderer renderer, Camera camera,
                         PlayerController playerController, List<NpcController> npcControllers,
                         List<FollowerController> followerControllers,
@@ -129,6 +130,12 @@ public class PlayingState : IGameState
             _combatManager.AddEventLog($"Quest Completed: {questName}", new Color(100, 200, 100));
             _audioManager.PlaySound(SoundId.QuestCompleted);
         };
+
+        // Wire combat XP callback
+        _combatManager.OnActorKilled = (killer, killed) => AwardCombatExperience(killer, killed);
+
+        // Wire quest XP callback
+        _conversationRunner.OnExperienceGained = xp => AwardQuestExperience(xp);
 
         // Wire combat music transitions
         _combatManager.OnCombatStarted = () => _audioManager.PlayMusic(MusicId.Combat);
@@ -393,7 +400,30 @@ public class PlayingState : IGameState
 
         if (clickedNpc != null)
         {
-            if (clickedNpc.DomainActor.Status == ActorStatus.Dead)
+            if (clickedNpc.DomainActor.Status == ActorStatus.Dead && clickedNpc.IsFollower)
+            {
+                // Dead followers — Inspect, Loot, and Dismiss
+                var deadFollower = clickedNpc;
+                var deadFollowerName = clickedNpc.Label;
+                _uiManager.ShowContextMenu(screenPos,
+                    new List<string> { "Inspect", "Loot", "Dismiss" },
+                    index =>
+                    {
+                        if (index == 0) // Inspect
+                        {
+                            InspectNpc(deadFollower);
+                        }
+                        else if (index == 1) // Loot
+                        {
+                            StartLoot(deadFollower);
+                        }
+                        else if (index == 2) // Dismiss
+                        {
+                            DismissFollower(deadFollowerName);
+                        }
+                    });
+            }
+            else if (clickedNpc.DomainActor.Status == ActorStatus.Dead)
             {
                 // Dead NPCs — Inspect and Loot
                 var deadNpc = clickedNpc;
@@ -805,6 +835,84 @@ public class PlayingState : IGameState
         }
     }
 
+    private void AwardCombatExperience(ActorSprite killer, ActorSprite killed)
+    {
+        var killedActor = killed.DomainActor as LeveledActor;
+        if (killedActor == null) return;
+
+        var enemyLevel = ExperienceCalculator.CalculateLevelFromExperience(killedActor.ExperiencePoints);
+        var xp = ExperienceCalculator.GetCombatExperience(enemyLevel);
+
+        // Award to player
+        var player = _playerController.Sprite.DomainActor as LeveledActor;
+        if (player != null)
+            GainExperience(player, xp, _playerController.Sprite.Label);
+
+        // Award to alive followers
+        foreach (var follower in _followerControllers)
+        {
+            var fActor = follower.Sprite.DomainActor as LeveledActor;
+            if (fActor != null && fActor.Status == ActorStatus.Alive)
+                GainExperience(fActor, xp, follower.Sprite.Label);
+        }
+
+        // Check if killed actor is a follower — trigger quest failure if applicable
+        if (killed.IsFollower && killed.Label == "Mage" &&
+            _dataProvider.GetGameFlag("quest_active_retrieve_key") != null &&
+            _dataProvider.GetGameFlag("quest_failed_retrieve_key") == null &&
+            _dataProvider.GetGameFlag("quest_done_retrieve_key") == null)
+        {
+            _dataProvider.SetGameFlag("quest_failed_retrieve_key", "true");
+            _combatManager.AddEventLog("Quest Failed: Retrieve the Key of Stratholme", new Color(200, 100, 100));
+        }
+    }
+
+    private void AwardQuestExperience(int xp)
+    {
+        // Award to player
+        var player = _playerController.Sprite.DomainActor as LeveledActor;
+        if (player != null)
+            GainExperience(player, xp, _playerController.Sprite.Label);
+
+        // Award to alive followers
+        foreach (var follower in _followerControllers)
+        {
+            var fActor = follower.Sprite.DomainActor as LeveledActor;
+            if (fActor != null && fActor.Status == ActorStatus.Alive)
+                GainExperience(fActor, xp, follower.Sprite.Label);
+        }
+    }
+
+    private void GainExperience(LeveledActor actor, int amount, string actorName)
+    {
+        var oldLevel = ExperienceCalculator.CalculateLevelFromExperience(actor.ExperiencePoints);
+        actor.ExperiencePoints += amount;
+        var newLevel = ExperienceCalculator.CalculateLevelFromExperience(actor.ExperiencePoints);
+
+        _combatManager.AddEventLog($"{actorName} gains {amount} XP.", Color.Gold);
+
+        if (newLevel > oldLevel)
+        {
+            var levelsGained = newLevel - oldLevel;
+            var className = actor.ClassName;
+            if (!string.IsNullOrEmpty(className))
+            {
+                var charClass = _dataProvider.GetClass(className);
+                if (charClass != null)
+                {
+                    ExperienceCalculator.DistributeAttributePoints(actor, charClass, 7 * levelsGained);
+                }
+            }
+
+            // Full heal on level-up
+            actor.CurrentHitPoints = (decimal)actor.MaximumHitPoints;
+            actor.CurrentMana = (decimal)actor.MaximumMana;
+
+            _combatManager.AddEventLog($"{actorName} reached level {newLevel}!", new Color(255, 215, 0));
+            _audioManager.PlaySound(SoundId.LevelUp);
+        }
+    }
+
     private void RecalculateVision()
     {
         var px = _playerController.Sprite.TileX;
@@ -963,8 +1071,8 @@ public class PlayingState : IGameState
     }
 
     // Font accessor for game over text — gets font from any UIPanel via reflection or stored reference
-    private SpriteFont _font;
-    public SpriteFont Font
+    private SpriteFontBase _font;
+    public SpriteFontBase Font
     {
         get => _font;
         set => _font = value;

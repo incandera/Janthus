@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.EntityFrameworkCore;
+using FontStashSharp;
 using Janthus.Model.Entities;
 using Janthus.Model.Enums;
 using Janthus.Model.Services;
@@ -23,7 +24,8 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
 {
     private readonly GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
-    private SpriteFont _font;
+    private SpriteFontBase _font;
+    private FontSystem _fontSystem;
     private Texture2D _pixelTexture;
 
     private readonly InputManager _input = new();
@@ -104,7 +106,10 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
         _pixelTexture = new Texture2D(GraphicsDevice, 1, 1);
         _pixelTexture.SetData(new[] { Color.White });
 
-        _font = CreateDefaultFont();
+        _fontSystem = new FontSystem();
+        var fontPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Content", "fonts", "PressStart2P-Regular.ttf");
+        _fontSystem.AddFont(File.ReadAllBytes(fontPath));
+        _font = _fontSystem.GetFont(16);
 
         // Initialize database
         var options = new DbContextOptionsBuilder<JanthusDbContext>()
@@ -195,16 +200,18 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
         player.Willpower.Value = 5;
         player.Attunement.Value = 3;
         player.Luck.Value = 3;
+        player.DataProvider = _repository;
+        player.ClassName = "Soldier";
         player.CurrentHitPoints = (decimal)player.MaximumHitPoints;
         player.CurrentMana = (decimal)player.MaximumMana;
 
         var (chunkManager, renderer, camera) = SetupWorld();
 
-        // Place player near center, offset from the pond
+        // Place player northeast of the lake, within sight of water, near the Guard
         var worldCenterX = chunkManager.WorldWidth / 2;
         var worldCenterY = chunkManager.WorldHeight / 2;
-        var playerStartX = worldCenterX + 8;
-        var playerStartY = worldCenterY + 8;
+        var playerStartX = worldCenterX - 2;
+        var playerStartY = worldCenterY - 8;
 
         // Validate spawn — BFS to nearest walkable tile if blocked
         if (!chunkManager.IsWalkable(playerStartX, playerStartY))
@@ -266,6 +273,13 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
             {
                 Name = def.name
             };
+            npc.DataProvider = _repository;
+            npc.ClassName = def.name switch
+            {
+                "Mage" => "Mage",
+                "Merchant" => "Ranger",
+                _ => "Soldier"
+            };
             npc.CurrentHitPoints = (decimal)npc.MaximumHitPoints;
             npc.CurrentMana = (decimal)npc.MaximumMana;
 
@@ -287,10 +301,14 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
             if (_assetManager?.DefaultNpcSheet != null) npcSprite.SpriteSheet = _assetManager.DefaultNpcSheet;
             npcSprite.SnapVisualToTile(chunkManager);
 
-            // Calculate adversary relationship — force adversary for scenario combatants
+            // Calculate adversary relationship — force for scenario NPCs
             if (def.name == "Mercenary" || def.name == "Bandit")
             {
                 npcSprite.IsAdversary = true;
+            }
+            else if (def.name == "Guard" || def.name == "Merchant" || def.name == "Mage")
+            {
+                npcSprite.IsAdversary = false;
             }
             else
             {
@@ -427,6 +445,9 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
         player.CurrentMana = playerData.CurrentMana;
         player.Gold = playerData.Gold;
         player.Status = Enum.Parse<ActorStatus>(playerData.Status);
+        player.DataProvider = _repository;
+        player.ExperiencePoints = playerData.ExperiencePoints;
+        player.ClassName = string.IsNullOrEmpty(playerData.ClassName) ? "Soldier" : playerData.ClassName;
 
         // Restore player inventory
         foreach (var inv in playerData.Inventory)
@@ -473,6 +494,9 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
             npc.CurrentMana = npcData.CurrentMana;
             npc.Gold = npcData.Gold;
             npc.Status = Enum.Parse<ActorStatus>(npcData.Status);
+            npc.DataProvider = _repository;
+            npc.ExperiencePoints = npcData.ExperiencePoints;
+            npc.ClassName = string.IsNullOrEmpty(npcData.ClassName) ? "Soldier" : npcData.ClassName;
 
             // Restore NPC inventory
             foreach (var inv in npcData.Inventory)
@@ -734,6 +758,7 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
 
     protected override void UnloadContent()
     {
+        _fontSystem?.Dispose();
         _audioManager?.Dispose();
         base.UnloadContent();
     }
@@ -869,169 +894,4 @@ public class JanthusGame : Microsoft.Xna.Framework.Game
         base.Draw(gameTime);
     }
 
-    private SpriteFont CreateDefaultFont()
-    {
-        // Create a basic runtime font using MonoGame's built-in capabilities
-        // We'll generate a simple bitmap font from a texture atlas
-        return BuildRuntimeFont();
-    }
-
-    private SpriteFont BuildRuntimeFont()
-    {
-        // Build a simple monospace bitmap font at runtime
-        var charWidth = 8;
-        var charHeight = 14;
-        var chars = new List<char>();
-        var glyphBounds = new List<Rectangle>();
-        var croppings = new List<Rectangle>();
-        var kerning = new List<Vector3>();
-
-        // ASCII printable characters 32-126
-        for (char c = (char)32; c <= (char)126; c++)
-        {
-            chars.Add(c);
-        }
-
-        var columns = 16;
-        var rows = (int)Math.Ceiling(chars.Count / (float)columns);
-        var textureWidth = columns * charWidth;
-        var textureHeight = rows * charHeight;
-
-        var fontTexture = new Texture2D(GraphicsDevice, textureWidth, textureHeight);
-        var pixels = new Color[textureWidth * textureHeight];
-
-        // Generate simple pixel font glyphs
-        for (int i = 0; i < chars.Count; i++)
-        {
-            var col = i % columns;
-            var row = i / columns;
-            var gx = col * charWidth;
-            var gy = row * charHeight;
-
-            DrawCharGlyph(pixels, textureWidth, gx, gy, charWidth, charHeight, chars[i]);
-
-            glyphBounds.Add(new Rectangle(gx, gy, charWidth, charHeight));
-            croppings.Add(Rectangle.Empty);
-            kerning.Add(new Vector3(0, charWidth, 1));
-        }
-
-        fontTexture.SetData(pixels);
-
-        return new SpriteFont(fontTexture, glyphBounds, croppings, chars, charHeight, 0, kerning, '?');
-    }
-
-    private void DrawCharGlyph(Color[] pixels, int texWidth, int gx, int gy, int w, int h, char c)
-    {
-        // Simple 8x14 pixel font rendering for basic ASCII
-        var glyphData = GetGlyphPattern(c);
-        if (glyphData == null) return;
-
-        for (int row = 0; row < Math.Min(glyphData.Length, h); row++)
-        {
-            var bits = glyphData[row];
-            for (int col = 0; col < w; col++)
-            {
-                if ((bits & (1 << (7 - col))) != 0)
-                {
-                    var px = gx + col;
-                    var py = gy + row;
-                    if (px < texWidth && py < (pixels.Length / texWidth))
-                        pixels[py * texWidth + px] = Color.White;
-                }
-            }
-        }
-    }
-
-    private byte[] GetGlyphPattern(char c)
-    {
-        // Minimal 8x14 bitmap font patterns for essential characters
-        // Each byte represents 8 horizontal pixels (MSB = leftmost)
-        return c switch
-        {
-            ' ' => new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-            '!' => new byte[] { 0, 0, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x00, 0x18, 0x18, 0, 0, 0 },
-            '"' => new byte[] { 0, 0x66, 0x66, 0x66, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-            '\'' => new byte[] { 0, 0x18, 0x18, 0x18, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-            '#' => new byte[] { 0, 0, 0x6C, 0x6C, 0xFE, 0x6C, 0x6C, 0xFE, 0x6C, 0x6C, 0, 0, 0, 0 },
-            '(' => new byte[] { 0, 0x0C, 0x18, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x18, 0x0C, 0, 0, 0 },
-            ')' => new byte[] { 0, 0x30, 0x18, 0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x18, 0x30, 0, 0, 0 },
-            '+' => new byte[] { 0, 0, 0, 0, 0x18, 0x18, 0x7E, 0x18, 0x18, 0, 0, 0, 0, 0 },
-            ',' => new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x18, 0x18, 0x30, 0, 0 },
-            '-' => new byte[] { 0, 0, 0, 0, 0, 0, 0x7E, 0, 0, 0, 0, 0, 0, 0 },
-            '.' => new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x18, 0x18, 0, 0, 0 },
-            '/' => new byte[] { 0, 0x06, 0x06, 0x0C, 0x0C, 0x18, 0x18, 0x30, 0x30, 0x60, 0x60, 0, 0, 0 },
-            '0' => new byte[] { 0, 0, 0x3C, 0x66, 0x6E, 0x76, 0x66, 0x66, 0x66, 0x3C, 0, 0, 0, 0 },
-            '1' => new byte[] { 0, 0, 0x18, 0x38, 0x18, 0x18, 0x18, 0x18, 0x18, 0x7E, 0, 0, 0, 0 },
-            '2' => new byte[] { 0, 0, 0x3C, 0x66, 0x06, 0x0C, 0x18, 0x30, 0x60, 0x7E, 0, 0, 0, 0 },
-            '3' => new byte[] { 0, 0, 0x3C, 0x66, 0x06, 0x1C, 0x06, 0x06, 0x66, 0x3C, 0, 0, 0, 0 },
-            '4' => new byte[] { 0, 0, 0x0C, 0x1C, 0x3C, 0x6C, 0x7E, 0x0C, 0x0C, 0x0C, 0, 0, 0, 0 },
-            '5' => new byte[] { 0, 0, 0x7E, 0x60, 0x7C, 0x06, 0x06, 0x06, 0x66, 0x3C, 0, 0, 0, 0 },
-            '6' => new byte[] { 0, 0, 0x3C, 0x60, 0x60, 0x7C, 0x66, 0x66, 0x66, 0x3C, 0, 0, 0, 0 },
-            '7' => new byte[] { 0, 0, 0x7E, 0x06, 0x0C, 0x18, 0x18, 0x18, 0x18, 0x18, 0, 0, 0, 0 },
-            '8' => new byte[] { 0, 0, 0x3C, 0x66, 0x66, 0x3C, 0x66, 0x66, 0x66, 0x3C, 0, 0, 0, 0 },
-            '9' => new byte[] { 0, 0, 0x3C, 0x66, 0x66, 0x3E, 0x06, 0x06, 0x0C, 0x38, 0, 0, 0, 0 },
-            ':' => new byte[] { 0, 0, 0, 0, 0x18, 0x18, 0, 0, 0x18, 0x18, 0, 0, 0, 0 },
-            '=' => new byte[] { 0, 0, 0, 0, 0x7E, 0, 0x7E, 0, 0, 0, 0, 0, 0, 0 },
-            '>' => new byte[] { 0, 0, 0x60, 0x30, 0x18, 0x0C, 0x18, 0x30, 0x60, 0, 0, 0, 0, 0 },
-            '<' => new byte[] { 0, 0, 0x06, 0x0C, 0x18, 0x30, 0x18, 0x0C, 0x06, 0, 0, 0, 0, 0 },
-            '?' => new byte[] { 0, 0, 0x3C, 0x66, 0x06, 0x0C, 0x18, 0x18, 0x00, 0x18, 0, 0, 0, 0 },
-            'A' => new byte[] { 0, 0, 0x18, 0x3C, 0x66, 0x66, 0x7E, 0x66, 0x66, 0x66, 0, 0, 0, 0 },
-            'B' => new byte[] { 0, 0, 0x7C, 0x66, 0x66, 0x7C, 0x66, 0x66, 0x66, 0x7C, 0, 0, 0, 0 },
-            'C' => new byte[] { 0, 0, 0x3C, 0x66, 0x60, 0x60, 0x60, 0x60, 0x66, 0x3C, 0, 0, 0, 0 },
-            'D' => new byte[] { 0, 0, 0x78, 0x6C, 0x66, 0x66, 0x66, 0x66, 0x6C, 0x78, 0, 0, 0, 0 },
-            'E' => new byte[] { 0, 0, 0x7E, 0x60, 0x60, 0x7C, 0x60, 0x60, 0x60, 0x7E, 0, 0, 0, 0 },
-            'F' => new byte[] { 0, 0, 0x7E, 0x60, 0x60, 0x7C, 0x60, 0x60, 0x60, 0x60, 0, 0, 0, 0 },
-            'G' => new byte[] { 0, 0, 0x3C, 0x66, 0x60, 0x60, 0x6E, 0x66, 0x66, 0x3E, 0, 0, 0, 0 },
-            'H' => new byte[] { 0, 0, 0x66, 0x66, 0x66, 0x7E, 0x66, 0x66, 0x66, 0x66, 0, 0, 0, 0 },
-            'I' => new byte[] { 0, 0, 0x3C, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3C, 0, 0, 0, 0 },
-            'J' => new byte[] { 0, 0, 0x1E, 0x06, 0x06, 0x06, 0x06, 0x66, 0x66, 0x3C, 0, 0, 0, 0 },
-            'K' => new byte[] { 0, 0, 0x66, 0x6C, 0x78, 0x70, 0x78, 0x6C, 0x66, 0x66, 0, 0, 0, 0 },
-            'L' => new byte[] { 0, 0, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x7E, 0, 0, 0, 0 },
-            'M' => new byte[] { 0, 0, 0xC6, 0xEE, 0xFE, 0xD6, 0xC6, 0xC6, 0xC6, 0xC6, 0, 0, 0, 0 },
-            'N' => new byte[] { 0, 0, 0x66, 0x76, 0x7E, 0x6E, 0x66, 0x66, 0x66, 0x66, 0, 0, 0, 0 },
-            'O' => new byte[] { 0, 0, 0x3C, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x3C, 0, 0, 0, 0 },
-            'P' => new byte[] { 0, 0, 0x7C, 0x66, 0x66, 0x7C, 0x60, 0x60, 0x60, 0x60, 0, 0, 0, 0 },
-            'Q' => new byte[] { 0, 0, 0x3C, 0x66, 0x66, 0x66, 0x66, 0x66, 0x6E, 0x3C, 0x0E, 0, 0, 0 },
-            'R' => new byte[] { 0, 0, 0x7C, 0x66, 0x66, 0x7C, 0x78, 0x6C, 0x66, 0x66, 0, 0, 0, 0 },
-            'S' => new byte[] { 0, 0, 0x3C, 0x66, 0x60, 0x3C, 0x06, 0x06, 0x66, 0x3C, 0, 0, 0, 0 },
-            'T' => new byte[] { 0, 0, 0x7E, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0, 0, 0, 0 },
-            'U' => new byte[] { 0, 0, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x3C, 0, 0, 0, 0 },
-            'V' => new byte[] { 0, 0, 0x66, 0x66, 0x66, 0x66, 0x66, 0x3C, 0x3C, 0x18, 0, 0, 0, 0 },
-            'W' => new byte[] { 0, 0, 0xC6, 0xC6, 0xC6, 0xD6, 0xFE, 0xEE, 0xC6, 0xC6, 0, 0, 0, 0 },
-            'X' => new byte[] { 0, 0, 0x66, 0x66, 0x3C, 0x18, 0x3C, 0x66, 0x66, 0x66, 0, 0, 0, 0 },
-            'Y' => new byte[] { 0, 0, 0x66, 0x66, 0x66, 0x3C, 0x18, 0x18, 0x18, 0x18, 0, 0, 0, 0 },
-            'Z' => new byte[] { 0, 0, 0x7E, 0x06, 0x0C, 0x18, 0x30, 0x60, 0x60, 0x7E, 0, 0, 0, 0 },
-            'a' => new byte[] { 0, 0, 0, 0, 0x3C, 0x06, 0x3E, 0x66, 0x66, 0x3E, 0, 0, 0, 0 },
-            'b' => new byte[] { 0, 0, 0x60, 0x60, 0x7C, 0x66, 0x66, 0x66, 0x66, 0x7C, 0, 0, 0, 0 },
-            'c' => new byte[] { 0, 0, 0, 0, 0x3C, 0x66, 0x60, 0x60, 0x66, 0x3C, 0, 0, 0, 0 },
-            'd' => new byte[] { 0, 0, 0x06, 0x06, 0x3E, 0x66, 0x66, 0x66, 0x66, 0x3E, 0, 0, 0, 0 },
-            'e' => new byte[] { 0, 0, 0, 0, 0x3C, 0x66, 0x7E, 0x60, 0x60, 0x3C, 0, 0, 0, 0 },
-            'f' => new byte[] { 0, 0, 0x1C, 0x30, 0x7C, 0x30, 0x30, 0x30, 0x30, 0x30, 0, 0, 0, 0 },
-            'g' => new byte[] { 0, 0, 0, 0, 0x3E, 0x66, 0x66, 0x66, 0x3E, 0x06, 0x3C, 0, 0, 0 },
-            'h' => new byte[] { 0, 0, 0x60, 0x60, 0x7C, 0x66, 0x66, 0x66, 0x66, 0x66, 0, 0, 0, 0 },
-            'i' => new byte[] { 0, 0, 0x18, 0x00, 0x38, 0x18, 0x18, 0x18, 0x18, 0x3C, 0, 0, 0, 0 },
-            'j' => new byte[] { 0, 0, 0x06, 0x00, 0x06, 0x06, 0x06, 0x06, 0x06, 0x66, 0x3C, 0, 0, 0 },
-            'k' => new byte[] { 0, 0, 0x60, 0x60, 0x66, 0x6C, 0x78, 0x6C, 0x66, 0x66, 0, 0, 0, 0 },
-            'l' => new byte[] { 0, 0, 0x38, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3C, 0, 0, 0, 0 },
-            'm' => new byte[] { 0, 0, 0, 0, 0x6C, 0xFE, 0xD6, 0xC6, 0xC6, 0xC6, 0, 0, 0, 0 },
-            'n' => new byte[] { 0, 0, 0, 0, 0x7C, 0x66, 0x66, 0x66, 0x66, 0x66, 0, 0, 0, 0 },
-            'o' => new byte[] { 0, 0, 0, 0, 0x3C, 0x66, 0x66, 0x66, 0x66, 0x3C, 0, 0, 0, 0 },
-            'p' => new byte[] { 0, 0, 0, 0, 0x7C, 0x66, 0x66, 0x66, 0x7C, 0x60, 0x60, 0, 0, 0 },
-            'q' => new byte[] { 0, 0, 0, 0, 0x3E, 0x66, 0x66, 0x66, 0x3E, 0x06, 0x06, 0, 0, 0 },
-            'r' => new byte[] { 0, 0, 0, 0, 0x7C, 0x66, 0x60, 0x60, 0x60, 0x60, 0, 0, 0, 0 },
-            's' => new byte[] { 0, 0, 0, 0, 0x3E, 0x60, 0x3C, 0x06, 0x06, 0x7C, 0, 0, 0, 0 },
-            't' => new byte[] { 0, 0, 0x30, 0x30, 0x7C, 0x30, 0x30, 0x30, 0x30, 0x1C, 0, 0, 0, 0 },
-            'u' => new byte[] { 0, 0, 0, 0, 0x66, 0x66, 0x66, 0x66, 0x66, 0x3E, 0, 0, 0, 0 },
-            'v' => new byte[] { 0, 0, 0, 0, 0x66, 0x66, 0x66, 0x3C, 0x3C, 0x18, 0, 0, 0, 0 },
-            'w' => new byte[] { 0, 0, 0, 0, 0xC6, 0xC6, 0xD6, 0xFE, 0x6C, 0x6C, 0, 0, 0, 0 },
-            'x' => new byte[] { 0, 0, 0, 0, 0x66, 0x3C, 0x18, 0x3C, 0x66, 0x66, 0, 0, 0, 0 },
-            'y' => new byte[] { 0, 0, 0, 0, 0x66, 0x66, 0x66, 0x3E, 0x06, 0x06, 0x3C, 0, 0, 0 },
-            'z' => new byte[] { 0, 0, 0, 0, 0x7E, 0x0C, 0x18, 0x30, 0x60, 0x7E, 0, 0, 0, 0 },
-            '|' => new byte[] { 0, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0, 0, 0 },
-            '_' => new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7E, 0, 0, 0 },
-            '[' => new byte[] { 0, 0x3C, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x3C, 0, 0, 0, 0 },
-            ']' => new byte[] { 0, 0x3C, 0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x3C, 0, 0, 0, 0 },
-            _ => null
-        };
-    }
 }

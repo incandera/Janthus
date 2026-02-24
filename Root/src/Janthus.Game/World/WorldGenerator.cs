@@ -98,7 +98,7 @@ public static class WorldGenerator
             (centerX + 20, centerY + 5),   // Mage
             (centerX + 28, centerY + 15),  // Mercenary
             (centerX + 25, centerY + 20),  // Bandit
-            (centerX + 8, centerY + 8),    // Player
+            (centerX - 2, centerY - 8),    // Player
         };
 
         // First pass: save chunks

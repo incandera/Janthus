@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using FontStashSharp;
 using Janthus.Game.Input;
 using Janthus.Game.Saving;
 
@@ -16,7 +17,7 @@ public class SaveLoadPanel : UIPanel
 
     public Action<int> OnSlotConfirmed { get; set; }
 
-    public SaveLoadPanel(Texture2D pixelTexture, SpriteFont font, Rectangle bounds)
+    public SaveLoadPanel(Texture2D pixelTexture, SpriteFontBase font, Rectangle bounds)
         : base(pixelTexture, font, bounds)
     {
         IsVisible = false;
@@ -116,7 +117,7 @@ public class SaveLoadPanel : UIPanel
         var title = _isSaveMode ? "SAVE GAME" : "LOAD GAME";
         var titleSize = Font.MeasureString(title);
         spriteBatch.DrawString(Font, title, new Vector2(x - titleSize.X / 2, y), Color.Gold);
-        y += 40;
+        y += 50;
 
         // Slot entries
         for (int i = 0; i < SaveManager.MaxSlots; i++)
@@ -141,7 +142,7 @@ public class SaveLoadPanel : UIPanel
 
             var textSize = Font.MeasureString(text);
             spriteBatch.DrawString(Font, text, new Vector2(x - textSize.X / 2, y), color);
-            y += 30;
+            y += 34;
         }
 
         // Status message
@@ -154,9 +155,10 @@ public class SaveLoadPanel : UIPanel
         }
 
         // Hints
-        y = Bounds.Bottom - 30;
-        var hint = "Enter: Select   X: Delete   Esc: Cancel";
+        y = Bounds.Bottom - 34;
+        var hint = "[Enter] Select  [X] Delete  [Esc] Cancel";
         var hintSize = Font.MeasureString(hint);
-        spriteBatch.DrawString(Font, hint, new Vector2(x - hintSize.X / 2, y), Color.Gray);
+        var hintX = Math.Max(Bounds.X + 14, x - hintSize.X / 2);
+        spriteBatch.DrawString(Font, hint, new Vector2(hintX, y), Color.Gray);
     }
 }

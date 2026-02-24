@@ -205,6 +205,9 @@ public static class SaveManager
             data.Strength = leveled.Strength.Value;
             data.Willpower = leveled.Willpower.Value;
 
+            data.ExperiencePoints = leveled.ExperiencePoints;
+            data.ClassName = leveled.ClassName;
+
             foreach (var kvp in leveled.Equipment)
             {
                 data.Equipment.Add(new EquipmentSaveData

@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using FontStashSharp;
 using Janthus.Game.Audio;
 using Janthus.Game.Input;
 using Janthus.Game.Settings;
@@ -11,7 +12,7 @@ public class OptionsState : IGameState
 {
     private readonly JanthusGame _game;
     private readonly InputManager _input;
-    private readonly SpriteFont _font;
+    private readonly SpriteFontBase _font;
     private readonly AudioManager _audioManager;
 
     private const int RowCount = 6; // Resolution, Fullscreen, Master, Music, SFX, Ambient
@@ -23,7 +24,7 @@ public class OptionsState : IGameState
     private float _entrySfxVolume;
     private float _entryAmbientVolume;
 
-    public OptionsState(JanthusGame game, InputManager input, SpriteFont font, AudioManager audioManager)
+    public OptionsState(JanthusGame game, InputManager input, SpriteFontBase font, AudioManager audioManager)
     {
         _game = game;
         _input = input;

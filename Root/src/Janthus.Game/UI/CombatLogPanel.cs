@@ -1,5 +1,6 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using FontStashSharp;
 using Janthus.Game.Combat;
 using Janthus.Game.Input;
 
@@ -12,7 +13,7 @@ public class CombatLogPanel : UIPanel
     private const int PaddingTop = 6;
     private const int LineHeight = 16;
 
-    public CombatLogPanel(Texture2D pixelTexture, SpriteFont font, CombatManager combatManager, Rectangle bounds)
+    public CombatLogPanel(Texture2D pixelTexture, SpriteFontBase font, CombatManager combatManager, Rectangle bounds)
         : base(pixelTexture, font, bounds)
     {
         _combatManager = combatManager;

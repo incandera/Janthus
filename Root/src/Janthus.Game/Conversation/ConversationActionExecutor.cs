@@ -14,6 +14,7 @@ public class ConversationActionExecutor
     public Action<string> OnRecruitFollower { get; set; }
     public Action<string> OnQuestStarted { get; set; }
     public Action<string> OnQuestCompleted { get; set; }
+    public Action<int> OnExperienceGained { get; set; }
 
     public ConversationActionExecutor(IGameDataProvider dataProvider, PlayerCharacter player,
                                       AudioManager audioManager)
@@ -105,7 +106,8 @@ public class ConversationActionExecutor
                 break;
 
             case ConversationActionType.GiveExperience:
-                System.Console.WriteLine($"[Action] Give {action.Value} XP");
+                if (int.TryParse(action.Value, out var xpAmount))
+                    OnExperienceGained?.Invoke(xpAmount);
                 break;
 
             case ConversationActionType.RecruitFollower:

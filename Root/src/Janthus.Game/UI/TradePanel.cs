@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using FontStashSharp;
 using Janthus.Model.Entities;
 using Janthus.Model.Services;
 using Janthus.Game.Input;
@@ -22,15 +23,15 @@ public class TradePanel : UIPanel
     private double _statusTimer;
     private bool _lootMode; // true = looting a corpse (free take, no sell)
 
-    private const int PaddingX = 15;
-    private const int PaddingTop = 12;
-    private const int LineHeight = 20;
-    private const int ItemLineHeight = 22;
-    private const int HeaderHeight = 30;
-    private const int DescriptionHeight = 50;
-    private const int BottomBarHeight = 50;
+    private const int PaddingX = 18;
+    private const int PaddingTop = 14;
+    private const int LineHeight = 24;
+    private const int ItemLineHeight = 26;
+    private const int HeaderHeight = 36;
+    private const int DescriptionHeight = 60;
+    private const int BottomBarHeight = 60;
 
-    public TradePanel(Texture2D pixelTexture, SpriteFont font, Rectangle bounds)
+    public TradePanel(Texture2D pixelTexture, SpriteFontBase font, Rectangle bounds)
         : base(pixelTexture, font, bounds)
     {
         IsVisible = false;
@@ -473,7 +474,7 @@ public class TradePanel : UIPanel
         // Scroll indicator (top) — right-aligned just left of price column, on first item line
         if (scrollOffset > 0)
         {
-            var arrowText = "-- More --";
+            var arrowText = "...";
             var arrowSize = Font.MeasureString(arrowText);
             var priceGap = Font.MeasureString("0000g").X;
             spriteBatch.DrawString(Font, arrowText,
@@ -483,7 +484,7 @@ public class TradePanel : UIPanel
         // Scroll indicator (bottom) — right-aligned just left of price column, on last item line
         if (endIndex < items.Count)
         {
-            var arrowText = "-- More --";
+            var arrowText = "...";
             var arrowSize = Font.MeasureString(arrowText);
             var priceGap = Font.MeasureString("0000g").X;
             var arrowY = startY + (maxItems - 1) * ItemLineHeight + 2;

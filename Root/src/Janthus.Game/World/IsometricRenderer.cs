@@ -1,5 +1,6 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using FontStashSharp;
 using Janthus.Model.Entities;
 using Janthus.Model.Enums;
 using Janthus.Model.Interfaces;
@@ -15,7 +16,7 @@ public class IsometricRenderer
     public static int HeightStep => RenderConstants.HeightStep;
 
     private readonly Texture2D _pixelTexture;
-    private SpriteFont _font;
+    private SpriteFontBase _font;
     private TileAtlas _tileAtlas;
     private ObjectAtlas _objectAtlas;
 
@@ -24,7 +25,7 @@ public class IsometricRenderer
         _pixelTexture = pixelTexture;
     }
 
-    public void SetFont(SpriteFont font)
+    public void SetFont(SpriteFontBase font)
     {
         _font = font;
     }

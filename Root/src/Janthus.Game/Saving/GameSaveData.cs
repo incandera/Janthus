@@ -37,6 +37,8 @@ public class ActorSaveData
     public List<InventorySaveData> Inventory { get; set; } = new();
     public List<EquipmentSaveData> Equipment { get; set; } = new();
     public List<SkillSaveData> Skills { get; set; } = new();
+    public int ExperiencePoints { get; set; }
+    public string ClassName { get; set; } = string.Empty;
 }
 
 public class InventorySaveData

@@ -1,6 +1,8 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using FontStashSharp;
 using Janthus.Model.Entities;
+using Janthus.Model.Services;
 using Janthus.Game.Input;
 
 namespace Janthus.Game.UI;
@@ -9,7 +11,7 @@ public class CharacterPanel : UIPanel
 {
     private readonly PlayerCharacter _player;
 
-    public CharacterPanel(Texture2D pixelTexture, SpriteFont font, PlayerCharacter player, Rectangle bounds)
+    public CharacterPanel(Texture2D pixelTexture, SpriteFontBase font, PlayerCharacter player, Rectangle bounds)
         : base(pixelTexture, font, bounds)
     {
         _player = player;
@@ -24,7 +26,7 @@ public class CharacterPanel : UIPanel
 
         var x = Bounds.X + 15;
         var y = Bounds.Y + 10;
-        var lineHeight = 22;
+        var lineHeight = 24;
 
         spriteBatch.DrawString(Font, "CHARACTER", new Vector2(x, y), Color.Gold);
         y += lineHeight + 5;
@@ -32,8 +34,15 @@ public class CharacterPanel : UIPanel
         spriteBatch.DrawString(Font, $"Name: {_player.Name}", new Vector2(x, y), Color.White);
         y += lineHeight;
 
-        var levelText = _player.Level != null ? $"{_player.Level.Number} ({_player.Level.LevelRankGroupName})" : "?";
-        spriteBatch.DrawString(Font, $"Level: {levelText}", new Vector2(x, y), Color.White);
+        var xpLevel = ExperienceCalculator.CalculateLevelFromExperience(_player.ExperiencePoints);
+        var rankGroup = _player.Level?.LevelRankGroupName ?? "Unknown";
+        spriteBatch.DrawString(Font, $"Level: {xpLevel} ({rankGroup})", new Vector2(x, y), Color.White);
+        y += lineHeight;
+
+        var currentXp = _player.ExperiencePoints;
+        var nextLevelXp = ExperienceCalculator.GetExperienceForLevel(xpLevel + 1);
+        var xpText = xpLevel >= 20 ? $"Experience: {currentXp} (MAX)" : $"Experience: {currentXp} / {nextLevelXp}";
+        spriteBatch.DrawString(Font, xpText, new Vector2(x, y), Color.Gold);
         y += lineHeight;
 
         spriteBatch.DrawString(Font, $"Alignment: {_player.Alignment.Lawfulness} {_player.Alignment.Disposition}", new Vector2(x, y), Color.LightGray);

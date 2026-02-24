@@ -31,7 +31,11 @@
       "WebFetch(domain:community.monogame.net)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:leohpaz.itch.io)",
-      "WebFetch(domain:gravitysound.studio)"
+      "WebFetch(domain:gravitysound.studio)",
+      "Bash(cd:*)",
+      "Bash(powershell.exe:*)",
+      "Bash(curl:*)",
+      "Bash(head:*)"
     ]
   }
 }

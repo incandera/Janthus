@@ -1,5 +1,6 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using FontStashSharp;
 using Janthus.Game.Input;
 
 namespace Janthus.Game.UI;
@@ -9,9 +10,9 @@ public abstract class UIPanel
     public Rectangle Bounds { get; set; }
     public bool IsVisible { get; set; }
     protected Texture2D PixelTexture { get; }
-    protected SpriteFont Font { get; }
+    protected SpriteFontBase Font { get; }
 
-    protected UIPanel(Texture2D pixelTexture, SpriteFont font, Rectangle bounds)
+    protected UIPanel(Texture2D pixelTexture, SpriteFontBase font, Rectangle bounds)
     {
         PixelTexture = pixelTexture;
         Font = font;

@@ -154,6 +154,7 @@ public static class SeedData
             // Guard conversations
             new Conversation { Id = 1, NpcName = "Guard", Title = "Guard - Greeting", Priority = 0, EntryNodeId = 1, IsRepeatable = true },
             new Conversation { Id = 2, NpcName = "Guard", Title = "Guard - Quest Complete", Priority = 10, EntryNodeId = 5, IsRepeatable = false },
+            new Conversation { Id = 11, NpcName = "Guard", Title = "Guard - Post Quest", Priority = 1, EntryNodeId = 50, IsRepeatable = true },
             // Merchant conversations
             new Conversation { Id = 3, NpcName = "Merchant", Title = "Merchant - Default Greeting", Priority = 0, EntryNodeId = 10, IsRepeatable = true },
             // Mage conversations
@@ -183,6 +184,12 @@ public static class SeedData
                 Text = "I heard you retrieved the Key of Stratholme! The Mage will be most grateful. You've done a great service to this region." },
             new ConversationNode { Id = 6, ConversationId = 2, SpeakerName = "Guard",
                 Text = "Perhaps there will be peace in these parts again. Fare well, hero.", IsEndNode = true },
+
+            // --- Guard - Post Quest (Conv 11) ---
+            new ConversationNode { Id = 50, ConversationId = 11, SpeakerName = "Guard",
+                Text = "Good to see you again, hero. The roads have been much safer since you dealt with those mercenaries." },
+            new ConversationNode { Id = 51, ConversationId = 11, SpeakerName = "Guard",
+                Text = "Stay vigilant out there. And if you ever need anything, you know where to find me.", IsEndNode = true },
 
             // --- Merchant - Default Greeting (Conv 3) ---
             new ConversationNode { Id = 10, ConversationId = 3, SpeakerName = "Merchant",
@@ -281,6 +288,11 @@ public static class SeedData
             new ConversationResponse { Id = 5, NodeId = 5, Text = "It was the right thing to do.", NextNodeId = 6, SortOrder = 1 },
             new ConversationResponse { Id = 6, NodeId = 5, Text = "Those mercenaries had it coming.", NextNodeId = 6, SortOrder = 2 },
 
+            // --- Guard - Post Quest (Conv 11) ---
+            // Node 50 responses
+            new ConversationResponse { Id = 60, NodeId = 50, Text = "Glad I could help.", NextNodeId = 51, SortOrder = 1 },
+            new ConversationResponse { Id = 61, NodeId = 50, Text = "Farewell, guard.", NextNodeId = 51, SortOrder = 2 },
+
             // --- Merchant - Default Greeting (Conv 3) ---
             // Node 10 responses
             new ConversationResponse { Id = 10, NodeId = 10, Text = "Just browsing, thanks.", NextNodeId = 11, SortOrder = 1 },
@@ -345,8 +357,16 @@ public static class SeedData
 
         // ========== CONDITIONS ==========
         modelBuilder.Entity<ConversationCondition>().HasData(
+            // Guard - Greeting (Conv 1): only before key is retrieved
+            new ConversationCondition { Id = 24, ConversationId = 1, ResponseId = 0,
+                ConditionType = ConditionType.FlagNotSet, Value = "key_retrieved" },
+
             // Guard - Quest Complete (Conv 2): requires key_retrieved flag
             new ConversationCondition { Id = 1, ConversationId = 2, ResponseId = 0,
+                ConditionType = ConditionType.FlagSet, Value = "key_retrieved" },
+
+            // Guard - Post Quest (Conv 11): after key_retrieved, repeatable fallback
+            new ConversationCondition { Id = 25, ConversationId = 11, ResponseId = 0,
                 ConditionType = ConditionType.FlagSet, Value = "key_retrieved" },
 
             // Merchant response 11 (ask about Dunedain Amulet): requires talked_to_guard flag
@@ -458,11 +478,17 @@ public static class SeedData
             new ConversationAction { Id = 10, ResponseId = 27,
                 ActionType = ConversationActionType.StartQuest, Value = "retrieve_key" },
 
-            // Mage response 30 (give Health Potion): heal mage, take potion
+            // Mage response 27 (I'll get the Key): accept quest XP
+            new ConversationAction { Id = 24, ResponseId = 27,
+                ActionType = ConversationActionType.GiveExperience, Value = "25" },
+
+            // Mage response 30 (give Health Potion): heal mage, take potion, subgoal XP
             new ConversationAction { Id = 11, ResponseId = 30,
                 ActionType = ConversationActionType.SetFlag, Value = "mage_healed" },
             new ConversationAction { Id = 18, ResponseId = 30,
                 ActionType = ConversationActionType.TakeItem, Value = "Health Potion" },
+            new ConversationAction { Id = 25, ResponseId = 30,
+                ActionType = ConversationActionType.GiveExperience, Value = "50" },
 
             // Mage response 40 (glad I could help): complete quest, give gold reward
             new ConversationAction { Id = 12, ResponseId = 40,
@@ -470,30 +496,36 @@ public static class SeedData
             new ConversationAction { Id = 13, ResponseId = 40,
                 ActionType = ConversationActionType.GiveGold, Value = "200" },
             new ConversationAction { Id = 14, ResponseId = 40,
-                ActionType = ConversationActionType.GiveExperience, Value = "50" },
+                ActionType = ConversationActionType.GiveExperience, Value = "150" },
             // Mage response 41 (tough fight): same rewards
             new ConversationAction { Id = 15, ResponseId = 41,
                 ActionType = ConversationActionType.CompleteQuest, Value = "retrieve_key" },
             new ConversationAction { Id = 16, ResponseId = 41,
                 ActionType = ConversationActionType.GiveGold, Value = "200" },
             new ConversationAction { Id = 17, ResponseId = 41,
-                ActionType = ConversationActionType.GiveExperience, Value = "50" },
+                ActionType = ConversationActionType.GiveExperience, Value = "150" },
 
-            // Mage response 47 (welcome your company): recruit follower + set flag
+            // Mage response 47 (welcome your company): recruit follower + set flag + subgoal XP
             new ConversationAction { Id = 19, ResponseId = 47,
                 ActionType = ConversationActionType.RecruitFollower, Value = "Mage" },
             new ConversationAction { Id = 20, ResponseId = 47,
                 ActionType = ConversationActionType.SetFlag, Value = "mage_in_party" },
+            new ConversationAction { Id = 26, ResponseId = 47,
+                ActionType = ConversationActionType.GiveExperience, Value = "50" },
 
-            // Mage response 50 (reconsider - accept quest): start quest
+            // Mage response 50 (reconsider - accept quest): start quest + subgoal XP
             new ConversationAction { Id = 21, ResponseId = 50,
                 ActionType = ConversationActionType.StartQuest, Value = "retrieve_key" },
+            new ConversationAction { Id = 27, ResponseId = 50,
+                ActionType = ConversationActionType.GiveExperience, Value = "25" },
 
-            // Mage response 54 (give Health Potion during quest): heal mage, take potion
+            // Mage response 54 (give Health Potion during quest): heal mage, take potion, subgoal XP
             new ConversationAction { Id = 22, ResponseId = 54,
                 ActionType = ConversationActionType.SetFlag, Value = "mage_healed" },
             new ConversationAction { Id = 23, ResponseId = 54,
-                ActionType = ConversationActionType.TakeItem, Value = "Health Potion" }
+                ActionType = ConversationActionType.TakeItem, Value = "Health Potion" },
+            new ConversationAction { Id = 28, ResponseId = 54,
+                ActionType = ConversationActionType.GiveExperience, Value = "50" }
         );
     }
 
@@ -679,7 +711,7 @@ public static class SeedData
                 Description = "The Mage was ambushed by mercenaries who stole the Key of Stratholme, an ancient artifact that opens a vault to the north. He is too wounded to pursue them himself and has asked you to retrieve it.",
                 ActivationFlag = "quest_active_retrieve_key",
                 CompletionFlag = "quest_done_retrieve_key",
-                FailureFlag = "",
+                FailureFlag = "quest_failed_retrieve_key",
                 SortOrder = 1
             }
         );

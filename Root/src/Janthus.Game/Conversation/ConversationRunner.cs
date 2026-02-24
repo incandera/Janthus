@@ -39,6 +39,12 @@ public class ConversationRunner
         set => _actionExecutor.OnQuestCompleted = value;
     }
 
+    public Action<int> OnExperienceGained
+    {
+        get => _actionExecutor.OnExperienceGained;
+        set => _actionExecutor.OnExperienceGained = value;
+    }
+
     public ConversationRunner(IGameDataProvider dataProvider, PlayerCharacter player,
                               string playerClassName, AudioManager audioManager)
     {

@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using FontStashSharp;
 using Janthus.Game.Input;
 
 namespace Janthus.Game.UI;
@@ -24,7 +25,7 @@ public class DialogPanel : UIPanel
     private const int LineHeight = 18;
     private const int ResponseLineHeight = 22;
 
-    public DialogPanel(Texture2D pixelTexture, SpriteFont font, Rectangle bounds)
+    public DialogPanel(Texture2D pixelTexture, SpriteFontBase font, Rectangle bounds)
         : base(pixelTexture, font, bounds)
     {
         IsVisible = false;

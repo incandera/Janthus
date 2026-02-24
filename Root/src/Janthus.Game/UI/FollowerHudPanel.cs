@@ -1,7 +1,9 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using FontStashSharp;
 using Janthus.Model.Entities;
 using Janthus.Model.Enums;
+using Janthus.Model.Services;
 using Janthus.Game.Actors;
 using Janthus.Game.Input;
 
@@ -19,7 +21,7 @@ public class FollowerHudPanel : UIPanel
     private static readonly Color BgColor = new(20, 20, 30, 200);
     private static readonly Color BorderColor = new(80, 80, 100);
 
-    public FollowerHudPanel(Texture2D pixelTexture, SpriteFont font,
+    public FollowerHudPanel(Texture2D pixelTexture, SpriteFontBase font,
                             List<FollowerController> followers, Rectangle bounds)
         : base(pixelTexture, font, bounds)
     {
@@ -63,8 +65,11 @@ public class FollowerHudPanel : UIPanel
             var isDead = actor.Status == ActorStatus.Dead;
             var nameColor = isDead ? Color.DarkGray : Color.White;
 
-            // Name
-            var nameText = isDead ? $"{follower.Sprite.Label} (Dead)" : follower.Sprite.Label;
+            // Name + Level
+            var followerLevel = "";
+            if (actor is LeveledActor la)
+                followerLevel = $" Lv.{ExperienceCalculator.CalculateLevelFromExperience(la.ExperiencePoints)}";
+            var nameText = isDead ? $"{follower.Sprite.Label} (Dead)" : $"{follower.Sprite.Label}{followerLevel}";
             spriteBatch.DrawString(Font, nameText, new Vector2(x, y), nameColor);
             y += 20;
 
@@ -76,8 +81,8 @@ public class FollowerHudPanel : UIPanel
                 var hpFill = maxHp > 0 ? (float)(currentHp / maxHp) : 0;
 
                 spriteBatch.DrawString(Font, "HP", new Vector2(x, y), Color.Red);
-                DrawBar(spriteBatch, new Rectangle(x + 25, y + 2, 120, 12), hpFill, Color.Red, new Color(60, 20, 20));
-                spriteBatch.DrawString(Font, $"{(int)currentHp}/{(int)maxHp}", new Vector2(x + 150, y), Color.White);
+                DrawBar(spriteBatch, new Rectangle(x + 50, y + 2, 200, 12), hpFill, Color.Red, new Color(60, 20, 20));
+                spriteBatch.DrawString(Font, $"{(int)currentHp}/{(int)maxHp}", new Vector2(x + 260, y), Color.White);
                 y += 20;
 
                 // Mana bar (only for magic-capable followers)
@@ -88,8 +93,8 @@ public class FollowerHudPanel : UIPanel
                     var mpFill = maxMp > 0 ? (float)(currentMp / maxMp) : 0;
 
                     spriteBatch.DrawString(Font, "MP", new Vector2(x, y), Color.CornflowerBlue);
-                    DrawBar(spriteBatch, new Rectangle(x + 25, y + 2, 120, 12), mpFill, Color.CornflowerBlue, new Color(20, 20, 60));
-                    spriteBatch.DrawString(Font, $"{(int)currentMp}/{(int)maxMp}", new Vector2(x + 150, y), Color.White);
+                    DrawBar(spriteBatch, new Rectangle(x + 50, y + 2, 200, 12), mpFill, Color.CornflowerBlue, new Color(20, 20, 60));
+                    spriteBatch.DrawString(Font, $"{(int)currentMp}/{(int)maxMp}", new Vector2(x + 260, y), Color.White);
                     y += 20;
                 }
             }

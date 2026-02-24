@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using FontStashSharp;
 using Janthus.Game.Input;
 
 namespace Janthus.Game.UI;
@@ -19,7 +20,7 @@ public class ContextMenuPanel : UIPanel
     private const int PaddingX = 16;
     private const int PaddingY = 8;
 
-    public ContextMenuPanel(Texture2D pixelTexture, SpriteFont font, Viewport viewport)
+    public ContextMenuPanel(Texture2D pixelTexture, SpriteFontBase font, Viewport viewport)
         : base(pixelTexture, font, Rectangle.Empty)
     {
         IsVisible = false;

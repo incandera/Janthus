@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using FontStashSharp;
 using Janthus.Model.Entities;
 using Janthus.Model.Enums;
 using Janthus.Model.Services;
@@ -16,9 +17,9 @@ public class QuestJournalPanel : UIPanel
     private float _refreshTimer;
 
     private const float RefreshInterval = 0.5f;
-    private const int LeftPaneWidth = 220;
-    private const int Padding = 15;
-    private const int LineHeight = 20;
+    private const int LeftPaneWidth = 280;
+    private const int Padding = 18;
+    private const int LineHeight = 24;
 
     private static readonly Color BgColor = new(20, 20, 40, 220);
     private static readonly Color BorderColor = new(100, 80, 60);
@@ -27,7 +28,7 @@ public class QuestJournalPanel : UIPanel
     private static readonly Color RedColor = new(200, 100, 100);
     private static readonly Color HighlightColor = Color.White * 0.12f;
 
-    public QuestJournalPanel(Texture2D pixelTexture, SpriteFont font, IGameDataProvider dataProvider,
+    public QuestJournalPanel(Texture2D pixelTexture, SpriteFontBase font, IGameDataProvider dataProvider,
                              Rectangle bounds)
         : base(pixelTexture, font, bounds)
     {
@@ -204,8 +205,13 @@ public class QuestJournalPanel : UIPanel
 
                     spriteBatch.DrawString(Font, checkmark, new Vector2(rightX, ry), checkColor);
                     var goalTextColor = goal.IsOptional && !isComplete ? Color.LightGray : textColor;
-                    spriteBatch.DrawString(Font, goalText, new Vector2(rightX + 30, ry), goalTextColor);
-                    ry += LineHeight;
+                    var wrappedGoal = WrapText(goalText, rightWidth - 50);
+                    foreach (var goalLine in wrappedGoal)
+                    {
+                        if (ry > Bounds.Bottom - Padding - LineHeight) break;
+                        spriteBatch.DrawString(Font, goalLine, new Vector2(rightX + 50, ry), goalTextColor);
+                        ry += LineHeight;
+                    }
                 }
             }
         }

@@ -1,5 +1,6 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using FontStashSharp;
 using Janthus.Model.Entities;
 using Janthus.Model.Services;
 using Janthus.Game.Actors;
@@ -60,20 +61,20 @@ public class UIManager
     public Action<int> OnSaveSlot { get; set; }
     public Action<int> OnLoadSlot { get; set; }
 
-    public UIManager(Texture2D pixelTexture, SpriteFont font, PlayerCharacter player,
+    public UIManager(Texture2D pixelTexture, SpriteFontBase font, PlayerCharacter player,
                      Viewport viewport, CombatManager combatManager,
                      IGameDataProvider dataProvider, List<FollowerController> followerControllers,
                      AudioManager audioManager)
     {
         _audioManager = audioManager;
         _hud = new HudPanel(pixelTexture, font, player,
-            new Rectangle(10, 10, 350, 100));
+            new Rectangle(10, 10, 450, 135));
 
         _characterPanel = new CharacterPanel(pixelTexture, font, player,
-            new Rectangle(viewport.Width - 360, 10, 350, 460));
+            new Rectangle(viewport.Width - 510, 10, 500, 550));
 
         _pauseMenuPanel = new PauseMenuPanel(pixelTexture, font,
-            new Rectangle(viewport.Width / 2 - 120, viewport.Height / 2 - 115, 240, 230),
+            new Rectangle(viewport.Width / 2 - 150, viewport.Height / 2 - 130, 300, 260),
             audioManager);
 
         _dialogPanel = new DialogPanel(pixelTexture, font,
@@ -82,34 +83,35 @@ public class UIManager
         _contextMenu = new ContextMenuPanel(pixelTexture, font, viewport);
 
         _tradePanel = new TradePanel(pixelTexture, font,
-            new Rectangle(viewport.Width / 2 - 350, viewport.Height / 2 - 250, 700, 500));
+            new Rectangle(viewport.Width / 2 - 450, viewport.Height / 2 - 275, 900, 550));
 
         _inventoryPanel = new InventoryPanel(pixelTexture, font, player,
-            new Rectangle(10, 120, 350, 500));
+            new Rectangle(viewport.Width / 2 - 450, viewport.Height / 2 - 275, 900, 550));
 
         _combatLogPanel = new CombatLogPanel(pixelTexture, font, combatManager,
-            new Rectangle(10, viewport.Height - 180, 350, 150));
+            new Rectangle(10, viewport.Height - 200, 450, 170));
 
         _saveLoadPanel = new SaveLoadPanel(pixelTexture, font,
-            new Rectangle(viewport.Width / 2 - 200, viewport.Height / 2 - 150, 400, 300));
+            new Rectangle(viewport.Width / 2 - 330, viewport.Height / 2 - 170, 680, 340));
 
         _questJournal = new QuestJournalPanel(pixelTexture, font, dataProvider,
-            new Rectangle(viewport.Width / 2 - 350, viewport.Height / 2 - 250, 700, 500));
+            new Rectangle(viewport.Width / 2 - 475, viewport.Height / 2 - 275, 950, 550));
 
         _followerHud = new FollowerHudPanel(pixelTexture, font, followerControllers,
-            new Rectangle(10, 115, 350, 10));
+            new Rectangle(10, 150, 450, 10));
     }
 
     public void UpdateLayout(Viewport viewport)
     {
-        _characterPanel.Bounds = new Rectangle(viewport.Width - 360, 10, 350, 460);
-        _pauseMenuPanel.Bounds = new Rectangle(viewport.Width / 2 - 120, viewport.Height / 2 - 115, 240, 230);
+        _characterPanel.Bounds = new Rectangle(viewport.Width - 510, 10, 500, 550);
+        _pauseMenuPanel.Bounds = new Rectangle(viewport.Width / 2 - 150, viewport.Height / 2 - 130, 300, 260);
         _dialogPanel.Bounds = new Rectangle(50, viewport.Height - 170, viewport.Width - 100, 150);
         _contextMenu.UpdateViewport(viewport);
-        _tradePanel.Bounds = new Rectangle(viewport.Width / 2 - 350, viewport.Height / 2 - 250, 700, 500);
-        _combatLogPanel.Bounds = new Rectangle(10, viewport.Height - 180, 350, 150);
-        _saveLoadPanel.Bounds = new Rectangle(viewport.Width / 2 - 200, viewport.Height / 2 - 150, 400, 300);
-        _questJournal.Bounds = new Rectangle(viewport.Width / 2 - 350, viewport.Height / 2 - 250, 700, 500);
+        _tradePanel.Bounds = new Rectangle(viewport.Width / 2 - 450, viewport.Height / 2 - 275, 900, 550);
+        _inventoryPanel.Bounds = new Rectangle(viewport.Width / 2 - 450, viewport.Height / 2 - 275, 900, 550);
+        _combatLogPanel.Bounds = new Rectangle(10, viewport.Height - 200, 450, 170);
+        _saveLoadPanel.Bounds = new Rectangle(viewport.Width / 2 - 250, viewport.Height / 2 - 170, 500, 340);
+        _questJournal.Bounds = new Rectangle(viewport.Width / 2 - 450, viewport.Height / 2 - 275, 900, 550);
     }
 
     public void SetPaused(bool paused) => _hud.SetPaused(paused);
@@ -166,13 +168,21 @@ public class UIManager
 
     public void ToggleInventory()
     {
-        _inventoryPanel.IsVisible = !_inventoryPanel.IsVisible;
-        _audioManager.PlaySound(_inventoryPanel.IsVisible ? SoundId.UIOpen : SoundId.UIClose);
+        if (_inventoryPanel.IsVisible)
+        {
+            _inventoryPanel.Hide();
+            _audioManager.PlaySound(SoundId.UIClose);
+        }
+        else
+        {
+            _inventoryPanel.Show();
+            _audioManager.PlaySound(SoundId.UIOpen);
+        }
     }
 
     public void HideInventory()
     {
-        _inventoryPanel.IsVisible = false;
+        _inventoryPanel.Hide();
         _audioManager.PlaySound(SoundId.UIClose);
     }
 

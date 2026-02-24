@@ -38,6 +38,7 @@ public class CombatManager
 
     public Action OnCombatStarted { get; set; }
     public Action OnAllCombatEnded { get; set; }
+    public Action<ActorSprite, ActorSprite> OnActorKilled { get; set; }
     public IReadOnlyList<CombatLogEntry> CombatLog => _log;
 
     private bool _wasInCombat;
@@ -302,6 +303,7 @@ public class CombatManager
             defender.Status = ActorStatus.Dead;
             AddLogEntry($"{encounter.Defender.Label} has been slain!", Color.Red);
             _audioManager.PlaySoundAtDistance(SoundId.Death, soundDist);
+            OnActorKilled?.Invoke(encounter.Attacker, encounter.Defender);
         }
     }
 
